@@ -11,7 +11,7 @@ import os
 from contextlib import asynccontextmanager
 
 import uvicorn
-from aiogram.types import BotCommand, Update, MenuButtonWebApp, WebAppInfo
+from aiogram.types import BotCommand, MenuButtonWebApp, Update, WebAppInfo
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from .api import router as api_router
 from .bot_instance import get_bot, get_dispatcher
 from .config import (
+    DATABASE_URL,
     PORT,
     USE_WEBHOOK,
     WEBAPP_URL,
@@ -39,42 +40,58 @@ _polling_task: asyncio.Task | None = None
 
 async def _setup_bot() -> None:
     bot = get_bot()
-    await bot.set_my_commands(
-        [
-            BotCommand(command="start", description="Botni ishga tushirish"),
-            BotCommand(command="sell", description="Akkaunt sotish"),
-            BotCommand(command="my", description="Mening e'lonlarim"),
-            BotCommand(command="help", description="Yordam"),
-            BotCommand(command="admin", description="Admin panel"),
-        ]
-    )
-    if WEBAPP_URL:
+    me = await bot.get_me()  # token to'g'riligini tekshiradi
+    log.info("Bot ulandi: @%s (id=%s)", me.username, me.id)
+
+    with contextlib.suppress(Exception):
+        await bot.set_my_commands(
+            [
+                BotCommand(command="start", description="Botni ishga tushirish"),
+                BotCommand(command="sell", description="Akkaunt sotish"),
+                BotCommand(command="my", description="Mening e'lonlarim"),
+                BotCommand(command="help", description="Yordam"),
+                BotCommand(command="admin", description="Admin panel"),
+            ]
+        )
+    if WEBAPP_URL.startswith("https://"):
         with contextlib.suppress(Exception):
             await bot.set_chat_menu_button(
                 menu_button=MenuButtonWebApp(text="🛒 Magazin", web_app=WebAppInfo(url=WEBAPP_URL))
             )
 
 
+async def _start_polling() -> None:
+    global _polling_task
+    bot, dp = get_bot(), get_dispatcher()
+    with contextlib.suppress(Exception):
+        await bot.delete_webhook(drop_pending_updates=True)
+    _polling_task = asyncio.create_task(dp.start_polling(bot, handle_signals=False))
+    log.info("Polling rejimida ishlayapti")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _polling_task
     assert_config()
+    log.info("DB: %s", DATABASE_URL.split("@")[-1])
     await init_db()
     await _setup_bot()
 
     bot, dp = get_bot(), get_dispatcher()
-    if USE_WEBHOOK and WEBAPP_URL:
-        await bot.set_webhook(
-            url=f"{WEBAPP_URL}{WEBHOOK_PATH}",
-            secret_token=WEBHOOK_SECRET,
-            drop_pending_updates=True,
-            allowed_updates=dp.resolve_used_update_types(),
-        )
-        log.info("Webhook o'rnatildi: %s%s", WEBAPP_URL, WEBHOOK_PATH)
+    if USE_WEBHOOK:
+        try:
+            await bot.set_webhook(
+                url=f"{WEBAPP_URL}{WEBHOOK_PATH}",
+                secret_token=WEBHOOK_SECRET,
+                drop_pending_updates=True,
+                allowed_updates=dp.resolve_used_update_types(),
+            )
+            log.info("Webhook o'rnatildi: %s%s", WEBAPP_URL, WEBHOOK_PATH)
+        except Exception as exc:  # noqa: BLE001 — webhook bo'lmasa ham bot ishlashi kerak
+            log.error("Webhook o'rnatilmadi (%s) — polling rejimiga o'tildi", exc)
+            await _start_polling()
     else:
-        await bot.delete_webhook(drop_pending_updates=True)
-        _polling_task = asyncio.create_task(dp.start_polling(bot, handle_signals=False))
-        log.info("Polling rejimida ishlayapti")
+        log.warning("WEBAPP_URL yo'q yoki USE_WEBHOOK=0 — polling ishlatiladi")
+        await _start_polling()
 
     yield
 
@@ -104,7 +121,10 @@ async def telegram_webhook(
     if x_telegram_bot_api_secret_token != WEBHOOK_SECRET:
         raise HTTPException(status_code=401, detail="Unauthorized")
     update = Update.model_validate(await request.json(), context={"bot": get_bot()})
-    await get_dispatcher().feed_update(get_bot(), update)
+    try:
+        await get_dispatcher().feed_update(get_bot(), update)
+    except Exception:  # noqa: BLE001 — Telegram qayta yubormasligi uchun 200 qaytaramiz
+        log.exception("Update ishlanmadi")
     return {"ok": True}
 
 
