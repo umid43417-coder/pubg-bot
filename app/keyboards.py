@@ -7,12 +7,15 @@ from aiogram.types import (
     WebAppInfo,
 )
 
-from .config import WEBAPP_URL
+from . import config
 
 
 def main_menu(is_admin_user: bool = False) -> ReplyKeyboardMarkup:
-    rows = [
-        [KeyboardButton(text="🛒 Magazin", web_app=WebAppInfo(url=WEBAPP_URL or "https://example.com"))],
+    rows: list[list[KeyboardButton]] = []
+    # Mini App tugmasi faqat https domen mavjud bo'lsa qo'shiladi (aks holda Telegram xato beradi)
+    if config.WEBAPP_URL.startswith("https://"):
+        rows.append([KeyboardButton(text="🛒 Magazin", web_app=WebAppInfo(url=config.WEBAPP_URL))])
+    rows += [
         [KeyboardButton(text="➕ Akkaunt sotish"), KeyboardButton(text="📦 Mening e'lonlarim")],
         [KeyboardButton(text="ℹ️ Yordam")],
     ]
