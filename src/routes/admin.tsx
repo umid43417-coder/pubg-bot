@@ -9,6 +9,7 @@ import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useI18n } from "@/lib/i18n";
 import { AppShell } from "@/components/AppShell";
 import { AccountCard } from "@/components/AccountCard";
+import { BotSettingsPanel } from "@/components/BotSettingsPanel";
 import { fetchAccounts } from "@/lib/accounts";
 import { fetchAdminTelegram, saveAdminTelegram } from "@/lib/settings";
 import { Button } from "@/components/ui/button";
@@ -115,6 +116,8 @@ function AdminPage() {
           </Button>
         </div>
       </section>
+
+      <BotSettingsPanel />
 
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <div className="panel p-4">

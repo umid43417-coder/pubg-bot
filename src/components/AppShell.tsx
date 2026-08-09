@@ -7,7 +7,7 @@ import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useI18n } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
-import { FloatingLoot } from "@/components/GameFX";
+import { GamerBackdrop } from "@/components/GameFX";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user } = useSession();
@@ -32,7 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen pb-24">
-      <FloatingLoot />
+      <GamerBackdrop />
       <header className="sticky top-0 z-30 border-b border-border/70 bg-background/85 backdrop-blur-xl">
 
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">

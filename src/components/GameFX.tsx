@@ -1,4 +1,5 @@
 import ak47 from "@/assets/ak47.png";
+import gamerBg from "@/assets/gamer-bg.jpg";
 
 /** Floating neon AK-47 with pulsing crosshair ring — hero decoration. */
 export function FloatingGun({ className = "" }: { className?: string }) {
@@ -47,31 +48,47 @@ export function BulletTracers() {
   );
 }
 
-const floaters = ["🔫", "🎒", "🎈", "🔱", "💥", "⚜️", "🪖", "⚡️"];
+const sparks = Array.from({ length: 14 }, (_, i) => ({
+  left: `${(i * 7.3 + 4) % 96}%`,
+  size: 3 + (i % 4),
+  duration: `${9 + (i % 5) * 2.5}s`,
+  delay: `${i * 0.9}s`,
+}));
 
-/** Slowly drifting gamer emojis in the page background. */
-export function FloatingLoot() {
+/** Animated gamer battlefield backdrop: slow ken-burns image + rising sparks. */
+export function GamerBackdrop() {
   return (
-    <div
-      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden opacity-25"
-      aria-hidden="true"
-    >
-      {floaters.map((emoji, i) => (
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
+      <img
+        src={gamerBg}
+        alt=""
+        width={1600}
+        height={1008}
+        className="fx-kenburns absolute inset-0 size-full object-cover opacity-40"
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/85 to-background" />
+      <div className="fx-pulse-glow absolute inset-0 bg-grad-hero opacity-10" />
+      {sparks.map((spark, i) => (
         <span
-          key={emoji}
-          className="fx-gun absolute text-2xl sm:text-3xl"
+          key={i}
+          className="fx-spark absolute bottom-0 rounded-full bg-primary/70"
           style={{
-            left: `${(i * 12 + 5) % 95}%`,
-            top: `${(i * 23 + 8) % 90}%`,
-            animationDuration: `${5 + (i % 4) * 1.7}s`,
-            animationDelay: `${i * 0.6}s`,
+            left: spark.left,
+            width: spark.size,
+            height: spark.size,
+            animationDuration: spark.duration,
+            animationDelay: spark.delay,
           }}
-        >
-          {emoji}
-        </span>
+        />
       ))}
+      <span className="fx-scanline absolute left-0 h-px w-full bg-accent/25" />
     </div>
   );
+}
+
+/** Eski emoji fon — endi backdrop ustidagi yengil qatlam sifatida ishlatiladi. */
+export function FloatingLoot() {
+  return <GamerBackdrop />;
 }
 
 /** Rotating neon crosshair badge. */
