@@ -1,4 +1,5 @@
 import { botLog } from "./logger.server";
+import { storeCount, storeGet, storeSet } from "./store.server";
 
 /* ------------------------------------------------------------------ config */
 
@@ -14,7 +15,7 @@ export function appUrl() {
   return (
     normalizeUrl(process.env["PUBLIC_APP_URL"]) ??
     normalizeUrl(process.env["RAILWAY_PUBLIC_DOMAIN"]) ??
-    "https://project--8458c9ea-6160-4ab3-994b-990da916b84a-dev.lovable.app"
+    "https://pubg-bot-production.up.railway.app"
   );
 }
 
@@ -28,7 +29,11 @@ export async function tg(method: string, body: unknown) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; description?: string };
+  const payload = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    description?: string;
+    result?: unknown;
+  };
   if (!res.ok || payload.ok === false) {
     botLog.error("telegram_api_failed", new Error(payload.description ?? "unknown"), {
       method,
@@ -43,40 +48,39 @@ async function send(chatId: number, text: string, extra: Record<string, unknown>
     chat_id: chatId,
     text,
     parse_mode: "HTML",
-    disable_web_page_preview: true,
+    link_preview_options: { is_disabled: true },
     ...extra,
   });
-  // Agar klaviatura/web_app tufayli xato bo'lsa — matnni klaviatarasiz yuboramiz.
-  if (payload.ok === false && extra['reply_markup']) {
+  if (payload.ok === false && extra["reply_markup"]) {
     await tg("sendMessage", {
       chat_id: chatId,
       text,
       parse_mode: "HTML",
-      disable_web_page_preview: true,
+      link_preview_options: { is_disabled: true },
     });
   }
   return payload;
 }
 
-/* ---------------------------------------------------------------- settings */
+/* --------------------------------------------------------------- defaults */
 
 const RULES_DEFAULT = [
-  "📜 <b>PUBG MARKET — QOIDALAR</b>",
+  "📜 <b>PUBG SAVDO — QOIDALAR</b>",
+  "━━━━━━━━━━━━━━━━━━",
   "",
   "🎯 <b>1. UMUMIY</b>",
-  "• Bu yerda faqat <b>PUBG Mobile</b> akkauntlari oldi-sotdisi.",
-  "• Har bir kelishuv <b>admin kafolati</b> ostida o'tadi. Adminsiz savdo = xavf.",
+  "• Bu yerda faqat <b>PUBG Mobile</b> va o'yin xizmatlari savdosi.",
+  "• Har bir kelishuv <b>admin kafolati (garant)</b> ostida o'tadi.",
   "• Aldov, spam va soxta e'lon — <b>bir umrlik ban</b> 🚫",
   "",
   "🛒 <b>2. XARIDOR UCHUN</b>",
   "• Avval akkauntning <b>video va rasmlarini</b> to'liq ko'ring.",
-  "• Pulni faqat <b>admin orqali</b> o'tkazing. To'g'ridan-to'g'ri o'tkazma — o'z javobgarligingizda.",
+  "• Pulni faqat <b>admin orqali</b> o'tkazing.",
   "• Akkaunt qabul qilingach, <b>mail va parolni darhol almashtiring</b> 🔐",
   "",
   "💰 <b>3. SOTUVCHI UCHUN</b>",
   "• E'londa <b>haqiqiy</b> LVL, skin, RP va statistikani ko'rsating.",
-  "• Rasm va video <b>o'zingizniki</b> bo'lsin, internetdan olingan bo'lmasin.",
-  "• Sotilgan akkauntni <b>qayta tiklashga urinish</b> — ban + qora ro'yxat ⚠️",
+  "• Sotilgan akkauntni qaytarishga urinish — ban + qora ro'yxat ⚠️",
   "",
   "🤝 <b>4. SAVDO TARTIBI</b>",
   "1️⃣ Xaridor adminga yozadi",
@@ -86,109 +90,82 @@ const RULES_DEFAULT = [
   "5️⃣ Pul sotuvchiga o'tkaziladi ✅",
   "",
   "⏱ <b>5. MUHIM</b>",
-  "• Tekshiruv muddati: <b>24 soat</b>. Shu vaqt ichida muammo bo'lsa — admin hal qiladi.",
-  "• Qoidalarni buzgan tomon pulni qaytaradi.",
+  "• Tekshiruv muddati: <b>24 soat</b>.",
+  "• Qoidani buzgan tomon pulni qaytaradi.",
   "",
   "🔥 <b>GG WP — halol savdo, tinch o'yin!</b>",
 ].join("\n");
 
 export const SETTING_DEFAULTS: Record<string, string> = {
   bot_welcome:
-    "🎮 <b>PUBG MARKET</b>\n\n⚔️ Akkaunt sotib olish yoki sotish uchun quyidagi menyudan foydalaning.\n🔒 Har bir savdo admin kafolati ostida.",
+    "🎮 <b>PUBG SAVDO ORG</b> 🎮\n━━━━━━━━━━━━━━━━━━\n⚔️ Akkaunt, UC, Steam, Roblox va TG Premium — barchasi bir joyda.\n🛡 Har bir savdo <b>admin kafolati</b> ostida.\n⚡️ Tez • Ishonchli • Arzon",
   bot_about:
-    "ℹ️ <b>Biz haqimizda</b>\n\nPUBG MARKET — akkauntlarni xavfsiz oldi-sotdi qiladigan garant platforma. 🛡\nHar bir kelishuv admin nazoratida amalga oshiriladi.",
+    "ℹ️ <b>BIZ HAQIMIZDA</b>\n━━━━━━━━━━━━━━━━━━\n🏆 PUBG SAVDO ORG — o'yinchilar uchun garant platforma.\n🛡 Har bir kelishuv admin nazoratida.\n⏱ 24/7 qo'llab-quvvatlash.\n💎 Minglab mamnun mijozlar.",
   bot_price: "💰 <b>Xizmat haqi:</b> 5% (kelishuv summasidan)",
-  bot_orders_empty: "🧾 Sizda hozircha buyurtma yo'q. Magazindan akkaunt tanlang 👇",
-  bot_support: "@admin",
+  bot_orders_empty: "🧾 Hozircha e'lon yo'q. Magazindan tanlang 👇",
+  bot_support: "@PUBG_SAVDO_ORG_ADMIN",
+  bot_channel: "https://t.me/PUBG_SAVDO_CHANNEL",
+  bot_reviews: "https://t.me/PUBG_SAVDO_CHANNEL",
+  bot_force_sub: "on",
   bot_rules: RULES_DEFAULT,
   bot_admin_ids: "",
 };
 
 export const EDITABLE: { key: string; label: string }[] = [
+  { key: "bot_support", label: "👑 Admin ssilkasi" },
+  { key: "bot_channel", label: "📣 Majburiy obuna kanali" },
+  { key: "bot_reviews", label: "💬 Otzivlar havolasi" },
   { key: "bot_welcome", label: "👋 Salomlashish matni" },
   { key: "bot_rules", label: "📜 Qoidalar matni" },
   { key: "bot_about", label: "ℹ️ Biz haqimizda" },
   { key: "bot_price", label: "💰 Narx / xizmat haqi" },
-  { key: "bot_orders_empty", label: "🧾 Buyurtma bo'sh matni" },
-  { key: "bot_support", label: "📞 Aloqa (admin username)" },
-  { key: "bot_admin_ids", label: "👑 Admin ID lar (vergul bilan)" },
+  { key: "bot_orders_empty", label: "🧾 Bo'sh e'lon matni" },
+  { key: "bot_admin_ids", label: "🛠 Admin ID lar (vergul bilan)" },
 ];
 
-async function db() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin;
-}
-
 export async function getSetting(key: string): Promise<string> {
-  try {
-    const client = await db();
-    const { data, error } = await client
-      .from("app_settings")
-      .select("value")
-      .eq("key", key)
-      .maybeSingle();
-    if (error) throw error;
-    const value = (data?.value ?? "").trim();
-    return value || SETTING_DEFAULTS[key] || "";
-  } catch (error) {
-    botLog.error("setting_read_failed", error, { key });
-    return SETTING_DEFAULTS[key] ?? "";
-  }
+  const value = await storeGet(key);
+  return (value ?? "").trim() || (SETTING_DEFAULTS[key] ?? "");
 }
 
 export async function setSetting(key: string, value: string) {
-  const client = await db();
-  const { error } = await client
-    .from("app_settings")
-    .upsert({ key, value, updated_at: new Date().toISOString() });
-  if (error) throw error;
+  await storeSet(key, value);
   botLog.info("setting_updated", { key });
 }
 
 async function isAdmin(userId: number): Promise<boolean> {
-  try {
-    const fromEnv = (process.env["BOT_ADMIN_IDS"] ?? "").split(",");
-    const fromDb = (await getSetting("bot_admin_ids")).split(",");
-    return [...fromEnv, ...fromDb].map((s) => s.trim()).includes(String(userId));
-  } catch (error) {
-    botLog.error("is_admin_failed", error, { userId });
-    return (process.env["BOT_ADMIN_IDS"] ?? "")
-      .split(",")
-      .map((s) => s.trim())
-      .includes(String(userId));
-  }
+  const fromEnv = (process.env["BOT_ADMIN_IDS"] ?? "").split(",");
+  const fromDb = (await getSetting("bot_admin_ids")).split(",");
+  return [...fromEnv, ...fromDb].map((s) => s.trim()).includes(String(userId));
+}
+
+/* ------------------------------------------------------ links & normalizers */
+
+function tgLink(raw: string) {
+  const value = (raw ?? "").trim();
+  if (!value) return null;
+  if (value.startsWith("http")) return value;
+  return `https://t.me/${value.replace(/^@/, "")}`;
+}
+
+function channelUsername(raw: string) {
+  const value = (raw ?? "").trim();
+  if (!value) return null;
+  const match = value.match(/t\.me\/(?:s\/)?([A-Za-z0-9_]+)/);
+  const name = match?.[1] ?? value.replace(/^@/, "");
+  return /^[A-Za-z0-9_]{4,}$/.test(name) ? `@${name}` : null;
 }
 
 /* ------------------------------------------------------------- edit states */
 
 const stateKey = (chatId: number) => `bot_state:${chatId}`;
-
-async function setPendingEdit(chatId: number, key: string | null) {
-  try {
-    await setSetting(stateKey(chatId), key ?? "");
-  } catch (error) {
-    botLog.error("pending_edit_failed", error, { chatId });
-  }
-}
-
-async function getPendingEdit(chatId: number): Promise<string> {
-  try {
-    const client = await db();
-    const { data } = await client
-      .from("app_settings")
-      .select("value")
-      .eq("key", stateKey(chatId))
-      .maybeSingle();
-    return (data?.value ?? "").trim();
-  } catch {
-    return "";
-  }
-}
+const setPendingEdit = (chatId: number, key: string | null) => storeSet(stateKey(chatId), key ?? "");
+const getPendingEdit = async (chatId: number) => (await storeGet(stateKey(chatId))) ?? "";
 
 /* --------------------------------------------------------------- keyboards */
 
 const BTN = {
-  shop: "🛒 MAGAZIN",
+  shop: "🎮 MAGAZIN",
   sell: "💰 Sotish",
   orders: "🧾 E'lonlar",
   rules: "📜 Qoidalar",
@@ -199,11 +176,10 @@ const BTN = {
   admin: "🛠 Admin panel",
 };
 
-function mainKeyboard(admin: boolean) {
-  const url = appUrl();
+function replyKeyboard(admin: boolean) {
   return {
     keyboard: [
-      [{ text: BTN.shop, web_app: { url } }],
+      [{ text: BTN.shop, web_app: { url: appUrl() } }],
       [{ text: BTN.sell }, { text: BTN.orders }],
       [{ text: BTN.rules }, { text: BTN.profile }],
       [{ text: BTN.about }, { text: BTN.contact }],
@@ -211,22 +187,113 @@ function mainKeyboard(admin: boolean) {
     ],
     resize_keyboard: true,
     is_persistent: true,
-    input_field_placeholder: "Menyudan tanlang 🎮",
+    input_field_placeholder: "🎮 Menyudan tanlang",
   };
+}
+
+type Row = { text: string; web_app?: { url: string }; url?: string; callback_data?: string }[];
+
+async function mainInline(admin: boolean): Promise<{ inline_keyboard: Row[] }> {
+  const base = appUrl();
+  const support = tgLink(await getSetting("bot_support"));
+  const channel = tgLink(await getSetting("bot_channel"));
+  const reviews = tgLink(await getSetting("bot_reviews"));
+
+  const rows: Row[] = [
+    [{ text: "🎮 PUBG MOBILE AKKAUNTLAR", web_app: { url: base } }],
+    [
+      { text: "⭐️ TG Stars/Premium", web_app: { url: `${base}/?kategoriya=premium` } },
+      { text: "🎯 Steam", web_app: { url: `${base}/?kategoriya=steam` } },
+    ],
+    [
+      { text: "🧩 Mobile Legends", web_app: { url: `${base}/?kategoriya=ml` } },
+      { text: "🟥 Roblox", web_app: { url: `${base}/?kategoriya=roblox` } },
+    ],
+    [{ text: "🕹 Boshqa o'yinlar", web_app: { url: `${base}/?kategoriya=boshqa` } }],
+    [
+      { text: "💰 Akkaunt sotish", web_app: { url: `${base}/sotish` } },
+      { text: "🧾 Mening e'lonlarim", web_app: { url: `${base}/mening` } },
+    ],
+    [
+      { text: "📜 Qoidalar", callback_data: "rules" },
+      { text: "👤 Profil", callback_data: "profile" },
+    ],
+  ];
+
+  const social: Row = [];
+  if (channel) social.push({ text: "📣 Bizning kanal", url: channel });
+  if (reviews) social.push({ text: "💬 Otzivlar", url: reviews });
+  if (social.length) rows.push(social);
+  if (support) rows.push([{ text: "👑 ADMIN BILAN BOG'LANISH", url: support }]);
+  if (admin) rows.push([{ text: "🛠 Admin panel", callback_data: "admin" }]);
+  return { inline_keyboard: rows };
 }
 
 function adminKeyboard() {
   return {
     inline_keyboard: [
       ...EDITABLE.map((item) => [{ text: item.label, callback_data: `edit:${item.key}` }]),
-      [{ text: "📊 Statistika", callback_data: "stats" }],
+      [
+        { text: "📊 Statistika", callback_data: "stats" },
+        { text: "🔁 Webhook", callback_data: "rewebhook" },
+      ],
       [{ text: "✖️ Yopish", callback_data: "close" }],
     ],
   };
 }
 
-function shopInline(label = "🛒 Magazinni ochish") {
-  return { inline_keyboard: [[{ text: label, web_app: { url: appUrl() } }]] };
+async function shopInline(label = "🎮 Magazinni ochish") {
+  const support = tgLink(await getSetting("bot_support"));
+  return {
+    inline_keyboard: [
+      [{ text: label, web_app: { url: appUrl() } }],
+      ...(support ? [[{ text: "👑 Admin", url: support }]] : []),
+    ],
+  };
+}
+
+/* ------------------------------------------------------- majburiy obuna */
+
+async function subscriptionGate(chatId: number, userId: number): Promise<boolean> {
+  if ((await getSetting("bot_force_sub")).toLowerCase() !== "on") return true;
+  const raw = await getSetting("bot_channel");
+  const username = channelUsername(raw);
+  const link = tgLink(raw);
+  if (!username || !link) return true;
+
+  try {
+    const res = (await tg("getChatMember", { chat_id: username, user_id: userId })) as {
+      ok?: boolean;
+      result?: { status?: string };
+    };
+    if (res.ok === false) return true; // bot kanalda admin emas — bloklamaymiz
+    const status = res.result?.status ?? "left";
+    if (["creator", "administrator", "member", "restricted"].includes(status)) return true;
+  } catch {
+    return true;
+  }
+
+  await send(
+    chatId,
+    [
+      "🔐 <b>MAJBURIY OBUNA</b>",
+      "━━━━━━━━━━━━━━━━━━",
+      "",
+      "🚀 Botdan foydalanish uchun avval kanalimizga obuna bo'ling.",
+      "🎁 Kanalda: chegirmalar, yangi akkauntlar va konkurslar!",
+      "",
+      "👇 Obuna bo'lgach «Tekshirish» tugmasini bosing.",
+    ].join("\n"),
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "📣 Kanalga obuna bo'lish", url: link }],
+          [{ text: "✅ Tekshirish", callback_data: "checksub" }],
+        ],
+      },
+    },
+  );
+  return false;
 }
 
 /* ----------------------------------------------------------------- screens */
@@ -234,25 +301,25 @@ function shopInline(label = "🛒 Magazinni ochish") {
 async function showMain(chatId: number, userId: number, name: string) {
   const welcome = await getSetting("bot_welcome");
   const admin = await isAdmin(userId);
+  await send(chatId, "🎮 <b>Menyu tayyor</b> — pastdagi tugmalardan foydalaning 👇", {
+    reply_markup: replyKeyboard(admin),
+  });
   await send(
     chatId,
     `${welcome}\n\n👋 Salom, <b>${escapeHtml(name)}</b>! Omad tilaymiz — <b>GG</b> 🔥`,
-    { reply_markup: mainKeyboard(admin) },
-  );
-  await send(
-    chatId,
-    "⚡️ <b>Nima qilamiz?</b>\n🛒 Akkaunt olish\n💰 Akkaunt sotish\n📜 Qoidalarni o'qish",
-    { reply_markup: shopInline() },
+    { reply_markup: await mainInline(admin) },
   );
 }
 
 async function showRules(chatId: number) {
   const rules = await getSetting("bot_rules");
+  const support = tgLink(await getSetting("bot_support"));
   await send(chatId, rules, {
     reply_markup: {
       inline_keyboard: [
-        [{ text: "🛒 Magazinni ochish", web_app: { url: appUrl() } }],
-        [{ text: "📞 Admin bilan bog'lanish", callback_data: "contact" }],
+        [{ text: "🎮 Magazinni ochish", web_app: { url: appUrl() } }],
+        ...(support ? [[{ text: "👑 Admin bilan bog'lanish", url: support }]] : []),
+        [{ text: "🏠 Bosh menyu", callback_data: "home" }],
       ],
     },
   });
@@ -264,27 +331,47 @@ async function showProfile(chatId: number, userId: number, name: string, usernam
     chatId,
     [
       "👤 <b>PROFIL</b>",
-      "━━━━━━━━━━━━━━",
+      "━━━━━━━━━━━━━━━━━━",
       `🏷 Ism: <b>${escapeHtml(name)}</b>`,
       username ? `🔗 Username: @${escapeHtml(username)}` : "🔗 Username: —",
       `🆔 Telegram ID: <code>${userId}</code>`,
       `🎖 Maqom: ${admin ? "👑 Admin" : "🎮 Gamer"}`,
+      "",
+      "💎 Xaridlaringiz uchun rahmat!",
     ].join("\n"),
-    { reply_markup: shopInline("🛒 Magazin") },
+    { reply_markup: await shopInline("🎮 Magazin") },
+  );
+}
+
+async function showContact(chatId: number) {
+  const support = await getSetting("bot_support");
+  const link = tgLink(support);
+  await send(
+    chatId,
+    [
+      "📞 <b>ALOQA</b>",
+      "━━━━━━━━━━━━━━━━━━",
+      `👑 Admin: ${escapeHtml(support)}`,
+      "⏱ Ish vaqti: 24/7",
+      "🛡 Barcha savdolar garant asosida.",
+    ].join("\n"),
+    link ? { reply_markup: { inline_keyboard: [[{ text: "✍️ Adminga yozish", url: link }]] } } : {},
   );
 }
 
 async function showOrders(chatId: number) {
   try {
-    const client = await db();
-    const { data, error } = await client
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
       .from("accounts")
       .select("title, price, currency, sold, level")
       .order("created_at", { ascending: false })
       .limit(8);
     if (error) throw error;
     if (!data || data.length === 0) {
-      await send(chatId, await getSetting("bot_orders_empty"), { reply_markup: shopInline() });
+      await send(chatId, await getSetting("bot_orders_empty"), {
+        reply_markup: await shopInline(),
+      });
       return;
     }
     const lines = data.map(
@@ -293,14 +380,12 @@ async function showOrders(chatId: number) {
           a.price,
         ).toLocaleString("ru-RU")} ${a.currency}`,
     );
-    await send(chatId, `🧾 <b>SO'NGGI E'LONLAR</b>\n━━━━━━━━━━━━━━\n${lines.join("\n\n")}`, {
-      reply_markup: shopInline(),
+    await send(chatId, `🧾 <b>SO'NGGI E'LONLAR</b>\n━━━━━━━━━━━━━━━━━━\n${lines.join("\n\n")}`, {
+      reply_markup: await shopInline(),
     });
   } catch (error) {
     botLog.error("orders_failed", error, { chatId });
-    await send(chatId, "⚠️ E'lonlarni olishda xatolik. Keyinroq urinib ko'ring.", {
-      reply_markup: shopInline(),
-    });
+    await send(chatId, await getSetting("bot_orders_empty"), { reply_markup: await shopInline() });
   }
 }
 
@@ -316,7 +401,7 @@ type Update = {
   callback_query?: {
     id: string;
     data?: string;
-    from?: { id?: number; first_name?: string };
+    from?: { id?: number; first_name?: string; username?: string };
     message?: { chat?: { id?: number } };
   };
 };
@@ -329,11 +414,10 @@ export async function handleUpdate(update: Update) {
     botLog.error("handle_update_failed", error);
     const chatId = update.message?.chat?.id ?? update.callback_query?.message?.chat?.id;
     if (chatId) {
-      // Hech qachon jim qolmaydi — hech bo'lmasa menyuni qaytaramiz.
       await tg("sendMessage", {
         chat_id: chatId,
-        text: "🎮 PUBG MARKET\n\nMenyu tayyor 👇",
-        reply_markup: mainKeyboard(false),
+        text: "🎮 PUBG SAVDO ORG\n\nMenyu tayyor 👇",
+        reply_markup: replyKeyboard(false),
       }).catch(() => {});
     }
   }
@@ -350,33 +434,49 @@ async function handleMessage(update: Update) {
   const name = message?.from?.first_name ?? "gamer";
   botLog.info("message", { chatId, userId, text: text.slice(0, 64) });
 
-  // /start hech narsaga bog'liq bo'lmasin: birinchi navbatda ishlaydi.
+  const admin = await isAdmin(userId);
+
+  // Admin uchun kutilayotgan tahrir
+  const pending = await getPendingEdit(chatId);
+  if (pending && !text.startsWith("/") && text !== BTN.home && admin) {
+    await setSetting(pending, text);
+    await setPendingEdit(chatId, null);
+    await send(chatId, "✅ <b>Saqlandi!</b>", { reply_markup: adminKeyboard() });
+    return;
+  }
+
   if (command === "/start" || command === "/menu" || command === "/help") {
     await setPendingEdit(chatId, null);
+    if (!admin && !(await subscriptionGate(chatId, userId))) return;
     await showMain(chatId, userId, name);
+    return;
+  }
+  if (command === "/id") {
+    await send(chatId, `🆔 Sizning Telegram ID: <code>${userId}</code>`);
     return;
   }
   if (command === "/qoida" || command === "/qoidalar" || command === "/rules") {
     await showRules(chatId);
     return;
   }
-
-  // Admin uchun kutilayotgan tahrir
-  const pending = await getPendingEdit(chatId);
-  if (pending && !text.startsWith("/") && text !== BTN.home) {
-    if (!(await isAdmin(userId))) {
-      await setPendingEdit(chatId, null);
-      await send(chatId, "⛔️ Ruxsat yo'q.");
+  if (command === "/admin" || command === "/panel" || text === BTN.admin) {
+    if (!admin) {
+      await send(chatId, "⛔️ Bu bo'lim faqat adminlar uchun.");
       return;
     }
-    await setSetting(pending, text);
-    await setPendingEdit(chatId, null);
-    await send(chatId, "✅ Saqlandi.", { reply_markup: adminKeyboard() });
+    await send(
+      chatId,
+      "🛠 <b>ADMIN PANEL</b>\n━━━━━━━━━━━━━━━━━━\nO'zgartirmoqchi bo'lgan bandni tanlang:",
+      { reply_markup: adminKeyboard() },
+    );
     return;
   }
 
+  if (!admin && !(await subscriptionGate(chatId, userId))) return;
+
   switch (text) {
     case BTN.home:
+      await setPendingEdit(chatId, null);
       await showMain(chatId, userId, name);
       return;
     case BTN.profile:
@@ -390,39 +490,33 @@ async function handleMessage(update: Update) {
       return;
     case BTN.about:
       await send(chatId, `${await getSetting("bot_about")}\n\n${await getSetting("bot_price")}`, {
-        reply_markup: shopInline(),
+        reply_markup: await shopInline(),
       });
       return;
     case BTN.contact:
-      await send(chatId, `📞 <b>Aloqa</b>\nAdmin: ${escapeHtml(await getSetting("bot_support"))}`);
+      await showContact(chatId);
       return;
     case BTN.shop:
-      await send(chatId, "🛒 <b>Magazin</b> — pastdagi tugma orqali oching 👇", {
-        reply_markup: shopInline(),
+      await send(chatId, "🎮 <b>MAGAZIN</b>\nQuyidagi bo'limlardan birini tanlang 👇", {
+        reply_markup: await mainInline(admin),
       });
       return;
     case BTN.sell:
       await send(
         chatId,
-        "💰 <b>Akkaunt sotish</b>\n\n1️⃣ Magazinni oching\n2️⃣ «Sotish» bo'limiga o'ting\n3️⃣ Rasm va videolarni yuklang\n4️⃣ Narx va statistikani yozing ✅",
-        { reply_markup: shopInline("💰 Sotishni boshlash") },
+        "💰 <b>AKKAUNT SOTISH</b>\n━━━━━━━━━━━━━━━━━━\n1️⃣ Magazinni oching\n2️⃣ «Sotish» bo'limiga o'ting\n3️⃣ Rasm va videolarni yuklang\n4️⃣ Narx va statistikani yozing ✅",
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "💰 Sotishni boshlash", web_app: { url: `${appUrl()}/sotish` } }],
+            ],
+          },
+        },
       );
-      return;
-    case BTN.admin:
-    case "/admin":
-    case "/panel":
-      if (!(await isAdmin(userId))) {
-        botLog.warn("admin_denied", { userId });
-        await send(chatId, "⛔️ Bu bo'lim faqat adminlar uchun.");
-        return;
-      }
-      await send(chatId, "🛠 <b>ADMIN PANEL</b>\nO'zgartirmoqchi bo'lgan bandni tanlang:", {
-        reply_markup: adminKeyboard(),
-      });
       return;
     default:
       await send(chatId, "🎮 Quyidagi menyudan foydalaning 👇", {
-        reply_markup: mainKeyboard(await isAdmin(userId)),
+        reply_markup: await mainInline(admin),
       });
   }
 }
@@ -434,50 +528,95 @@ async function handleCallback(cb: NonNullable<Update["callback_query"]>) {
   await tg("answerCallbackQuery", { callback_query_id: cb.id });
   if (!chatId || !userId) return;
 
+  const admin = await isAdmin(userId);
+  const name = cb.from?.first_name ?? "gamer";
+
+  if (data === "checksub") {
+    if (await subscriptionGate(chatId, userId)) {
+      await send(chatId, "✅ <b>Rahmat!</b> Obuna tasdiqlandi 🎉");
+      await showMain(chatId, userId, name);
+    }
+    return;
+  }
+  if (data === "home") {
+    await showMain(chatId, userId, name);
+    return;
+  }
+  if (data === "rules") {
+    await showRules(chatId);
+    return;
+  }
+  if (data === "profile") {
+    await showProfile(chatId, userId, name, cb.from?.username);
+    return;
+  }
   if (data === "contact") {
-    await send(chatId, `📞 <b>Aloqa</b>\nAdmin: ${escapeHtml(await getSetting("bot_support"))}`);
+    await showContact(chatId);
     return;
   }
 
-  if (!(await isAdmin(userId))) {
+  if (!admin) {
     botLog.warn("admin_callback_denied", { userId, data });
     await send(chatId, "⛔️ Ruxsat yo'q.");
     return;
   }
 
+  if (data === "admin") {
+    await send(chatId, "🛠 <b>ADMIN PANEL</b>\n━━━━━━━━━━━━━━━━━━\nBandni tanlang:", {
+      reply_markup: adminKeyboard(),
+    });
+    return;
+  }
+
   if (data === "close") {
     await setPendingEdit(chatId, null);
-    await send(chatId, "Yopildi.", { reply_markup: mainKeyboard(true) });
+    await send(chatId, "✖️ Yopildi.", { reply_markup: replyKeyboard(true) });
+    return;
+  }
+
+  if (data === "rewebhook") {
+    webhookEnsured = false;
+    await ensureWebhook();
+    const info = (await tg("getWebhookInfo", {})) as { result?: { url?: string } };
+    await send(chatId, `🔁 Webhook: <code>${escapeHtml(info.result?.url ?? "—")}</code>`, {
+      reply_markup: adminKeyboard(),
+    });
     return;
   }
 
   if (data === "stats") {
-    try {
-      const client = await db();
-      const [{ count: total }, { count: sold }] = await Promise.all([
-        client.from("accounts").select("id", { count: "exact", head: true }),
-        client.from("accounts").select("id", { count: "exact", head: true }).eq("sold", true),
-      ]);
-      await send(
-        chatId,
-        `📊 <b>Statistika</b>\n🧾 Jami e'lonlar: ${total ?? 0}\n✅ Sotilgan: ${sold ?? 0}`,
-        { reply_markup: adminKeyboard() },
-      );
-    } catch (error) {
-      botLog.error("stats_failed", error);
-      await send(chatId, "⚠️ Statistikani olishda xatolik.");
-    }
+    const total = await storeCount("accounts");
+    const sold = await storeCount("accounts", { column: "sold", value: true });
+    await send(
+      chatId,
+      [
+        "📊 <b>STATISTIKA</b>",
+        "━━━━━━━━━━━━━━━━━━",
+        `🧾 Jami e'lonlar: <b>${total}</b>`,
+        `✅ Sotilgan: <b>${sold}</b>`,
+        `🌐 Sayt: <code>${escapeHtml(appUrl())}</code>`,
+      ].join("\n"),
+      { reply_markup: adminKeyboard() },
+    );
     return;
   }
 
   if (data.startsWith("edit:")) {
     const key = data.slice(5);
-    if (!EDITABLE.some((item) => item.key === key)) return;
+    const item = EDITABLE.find((entry) => entry.key === key);
+    if (!item) return;
     await setPendingEdit(chatId, key);
     const current = await getSetting(key);
     await send(
       chatId,
-      `✏️ Hozirgi qiymat:\n<code>${escapeHtml(current || "—")}</code>\n\nYangi matnni yuboring. Bekor qilish: ${BTN.home}`,
+      [
+        `✏️ <b>${escapeHtml(item.label)}</b>`,
+        "━━━━━━━━━━━━━━━━━━",
+        "Hozirgi qiymat:",
+        `<code>${escapeHtml(current || "—")}</code>`,
+        "",
+        `Yangi qiymatni yuboring. Bekor qilish: ${BTN.home}`,
+      ].join("\n"),
     );
   }
 }
@@ -494,27 +633,29 @@ export async function ensureWebhook(origin?: string) {
     if (!process.env["TELEGRAM_BOT_TOKEN"]) return;
     const base = normalizeUrl(origin) ?? appUrl();
     const url = `${base}/api/public/telegram/webhook`;
-    const info = (await tg("getWebhookInfo", {})) as { result?: { url?: string } };
-    if (info.result?.url === url) {
-      botLog.info("webhook_ok", { url });
-      return;
-    }
     const secret = process.env["TELEGRAM_WEBHOOK_SECRET"];
-    await tg("setWebhook", {
-      url,
-      ...(secret ? { secret_token: secret } : {}),
-      allowed_updates: ["message", "edited_message", "callback_query"],
-      drop_pending_updates: false,
-    });
+    const info = (await tg("getWebhookInfo", {})) as { result?: { url?: string } };
+    if (info.result?.url !== url) {
+      await tg("setWebhook", {
+        url,
+        ...(secret ? { secret_token: secret } : {}),
+        allowed_updates: ["message", "edited_message", "callback_query"],
+        drop_pending_updates: false,
+      });
+      botLog.info("webhook_set", { url });
+    }
     await tg("setMyCommands", {
       commands: [
         { command: "start", description: "🎮 Bosh menyu" },
         { command: "qoidalar", description: "📜 Qoidalar" },
         { command: "menu", description: "🏠 Menyuni ko'rsatish" },
+        { command: "id", description: "🆔 Telegram ID" },
         { command: "help", description: "ℹ️ Yordam" },
       ],
     });
-    botLog.info("webhook_set", { url });
+    await tg("setChatMenuButton", {
+      menu_button: { type: "web_app", text: "🎮 Magazin", web_app: { url: base } },
+    });
   } catch (error) {
     webhookEnsured = false;
     botLog.error("webhook_ensure_failed", error);
