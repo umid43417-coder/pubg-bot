@@ -19,7 +19,10 @@ export const Route = createFileRoute("/api/public/telegram/setup")({
           return new Response("Unauthorized", { status: 401 });
         }
 
-        const webhookUrl = `${url.origin}/api/public/telegram/webhook`;
+        // Proksi orqasida url.origin "http" bo'lishi mumkin — Telegram faqat HTTPS qabul qiladi.
+        const { appUrl } = await import("@/lib/bot/bot.server");
+        const origin = appUrl() ?? url.origin.replace(/^http:/, "https:");
+        const webhookUrl = `${origin.replace(/^http:/, "https:")}/api/public/telegram/webhook`;
 
         const set = await tg("setWebhook", {
           url: webhookUrl,
