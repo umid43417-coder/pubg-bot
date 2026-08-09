@@ -133,11 +133,23 @@ export async function setSetting(key: string, value: string) {
   botLog.info("setting_updated", { key });
 }
 
-async function isAdmin(userId: number): Promise<boolean> {
-  const fromEnv = (process.env["BOT_ADMIN_IDS"] ?? "").split(",");
-  const fromDb = (await getSetting("bot_admin_ids")).split(",");
-  return [...fromEnv, ...fromDb].map((s) => s.trim()).includes(String(userId));
+function adminIdList(env: string, db: string) {
+  return [...env.split(","), ...db.split(",")].map((s) => s.trim()).filter(Boolean);
 }
+
+async function isAdmin(userId: number, bootstrap = false): Promise<boolean> {
+  const fromEnv = process.env["BOT_ADMIN_IDS"] ?? "";
+  const fromDb = await getSetting("bot_admin_ids");
+  const ids = adminIdList(fromEnv, fromDb);
+  // Bootstrap: hech qanday admin sozlanmagan bo'lsa, birinchi /admin bosgan foydalanuvchi admin bo'ladi.
+  if (ids.length === 0 && bootstrap) {
+    await setSetting("bot_admin_ids", String(userId));
+    return true;
+  }
+  return ids.includes(String(userId));
+}
+
+
 
 /* ------------------------------------------------------ links & normalizers */
 
@@ -460,10 +472,11 @@ async function handleMessage(update: Update) {
     return;
   }
   if (command === "/admin" || command === "/panel" || text === BTN.admin) {
-    if (!admin) {
+    if (!(await isAdmin(userId, true))) {
       await send(chatId, "⛔️ Bu bo'lim faqat adminlar uchun.");
       return;
     }
+
     await send(
       chatId,
       "🛠 <b>ADMIN PANEL</b>\n━━━━━━━━━━━━━━━━━━\nO'zgartirmoqchi bo'lgan bandni tanlang:",
