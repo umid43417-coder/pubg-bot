@@ -45,12 +45,29 @@ export async function tg(method: string, body: unknown) {
   return payload;
 }
 
-export function webhookSecret() {
-  const configured = process.env["TELEGRAM_WEBHOOK_SECRET"]?.trim();
-  if (configured) return configured;
+export function derivedSecret() {
   const token = process.env["TELEGRAM_BOT_TOKEN"];
   if (!token) return null;
   return createHash("sha256").update(`telegram-webhook:${token}`).digest("base64url");
+}
+
+/** Webhook uchun yaroqli kalitlar: sozlangan + tokendan hosil qilingan. */
+export function validSecrets(): string[] {
+  const configured = process.env["TELEGRAM_WEBHOOK_SECRET"]?.trim();
+  const derived = derivedSecret();
+  return [configured, derived].filter(Boolean) as string[];
+}
+
+export function isValidSecret(candidate: string | null | undefined) {
+  const value = (candidate ?? "").trim();
+  if (!value) return false;
+  return validSecrets().includes(value);
+}
+
+export function webhookSecret() {
+  const configured = process.env["TELEGRAM_WEBHOOK_SECRET"]?.trim();
+  if (configured) return configured;
+  return derivedSecret();
 }
 
 async function send(chatId: number, text: string, extra: Record<string, unknown> = {}) {

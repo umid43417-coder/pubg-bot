@@ -74,6 +74,23 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+/**
+ * Supabase public konfiguratsiyasi.
+ * Build vaqtida VITE_* bo'lmasa ham, server process.env dan olib
+ * HTML ichiga yozadi va brauzer shundan foydalanadi.
+ */
+function publicSupabaseConfig(): { url: string; key: string } | null {
+  if (typeof window !== "undefined") {
+    return (window as unknown as { __SB__?: { url: string; key: string } }).__SB__ ?? null;
+  }
+  const url = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"];
+  const key =
+    process.env["SUPABASE_PUBLISHABLE_KEY"] ??
+    process.env["SUPABASE_ANON_KEY"] ??
+    process.env["VITE_SUPABASE_PUBLISHABLE_KEY"];
+  return url && key ? { url, key } : null;
+}
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -105,6 +122,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
+    scripts: (() => {
+      const cfg = publicSupabaseConfig();
+      return cfg ? [{ children: `window.__SB__=${JSON.stringify(cfg)}` }] : [];
+    })(),
   }),
   shellComponent: RootShell,
   component: RootComponent,

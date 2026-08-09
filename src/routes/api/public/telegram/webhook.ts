@@ -6,9 +6,8 @@ export const Route = createFileRoute("/api/public/telegram/webhook")({
       POST: async ({ request }) => {
         const { botLog } = await import("@/lib/bot/logger.server");
         try {
-          const { handleUpdate, webhookSecret } = await import("@/lib/bot/bot.server");
-          const secret = webhookSecret();
-          if (!secret || request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== secret) {
+          const { handleUpdate, isValidSecret } = await import("@/lib/bot/bot.server");
+          if (!isValidSecret(request.headers.get("X-Telegram-Bot-Api-Secret-Token"))) {
             botLog.warn("webhook_unauthorized");
             return new Response("Unauthorized", { status: 401 });
           }

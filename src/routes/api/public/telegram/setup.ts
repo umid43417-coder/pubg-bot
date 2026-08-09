@@ -11,11 +11,11 @@ export const Route = createFileRoute("/api/public/telegram/setup")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { tg, webhookSecret } = await import("@/lib/bot/bot.server");
+        const { tg, webhookSecret, isValidSecret } = await import("@/lib/bot/bot.server");
         const secret = webhookSecret();
         const url = new URL(request.url);
         const key = url.searchParams.get("key") ?? "";
-        if (!secret || key !== secret) {
+        if (!secret || !isValidSecret(key)) {
           return new Response("Unauthorized", { status: 401 });
         }
 
