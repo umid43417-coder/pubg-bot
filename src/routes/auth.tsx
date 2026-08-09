@@ -39,6 +39,15 @@ function loginToEmail(raw: string) {
   return `${safe}@pubgmarket.app`;
 }
 
+function friendlyAuthError(message: string) {
+  const value = message.toLowerCase();
+  if (value.includes("email rate limit")) return "Juda ko'p urinish bo'ldi. Bir necha daqiqadan keyin qayta urinib ko'ring.";
+  if (value.includes("already registered")) return "Bu login avval ro'yxatdan o'tgan. «Kirish» bo'limidan foydalaning.";
+  if (value.includes("invalid login")) return "Login yoki parol noto'g'ri.";
+  if (value.includes("signup") && value.includes("disabled")) return "Yangi hisob ochish vaqtincha yopilgan. Admin bilan bog'laning.";
+  return message;
+}
+
 function AuthPage() {
   const { user, loading } = useSession();
   const navigate = useNavigate();
@@ -101,26 +110,18 @@ function AuthPage() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { login: login.trim() } },
+      options: { data: { username: login.trim() } },
     });
     if (error) {
-      // Allaqachon mavjud bo'lsa — shunchaki kiritamiz.
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       setBusy(false);
-      if (signInError) toast.error(error.message);
-      else {
-        remember();
-        toast.success("Xush kelibsiz! 🎮");
-      }
+      toast.error(friendlyAuthError(error.message));
       return;
     }
     if (!data.session) {
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       setBusy(false);
-      if (signInError) {
-        toast.info("Hisob yaratildi. Endi «Kirish» bo'limidan login va parol bilan kiring.");
-        return;
-      }
+      toast.info("Hisob yaratildi. Tasdiqlash talab qilinsa, emailni tekshiring; keyin «Kirish»ni bosing.");
+      remember();
+      return;
     } else {
       setBusy(false);
     }

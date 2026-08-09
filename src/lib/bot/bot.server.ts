@@ -1,5 +1,6 @@
 import { botLog } from "./logger.server";
-import { storeCount, storeGet, storeSet } from "./store.server";
+import { claimUpdate, recentLogs, storeCount, storeGet, storeSet } from "./store.server";
+import { createHash } from "node:crypto";
 
 /* ------------------------------------------------------------------ config */
 
@@ -28,6 +29,7 @@ export async function tg(method: string, body: unknown) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(8_000),
   });
   const payload = (await res.json().catch(() => ({}))) as {
     ok?: boolean;
@@ -41,6 +43,14 @@ export async function tg(method: string, body: unknown) {
     });
   }
   return payload;
+}
+
+export function webhookSecret() {
+  const configured = process.env["TELEGRAM_WEBHOOK_SECRET"]?.trim();
+  if (configured) return configured;
+  const token = process.env["TELEGRAM_BOT_TOKEN"];
+  if (!token) return null;
+  return createHash("sha256").update(`telegram-webhook:${token}`).digest("base64url");
 }
 
 async function send(chatId: number, text: string, extra: Record<string, unknown> = {}) {
@@ -137,15 +147,10 @@ function adminIdList(env: string, db: string) {
   return [...env.split(","), ...db.split(",")].map((s) => s.trim()).filter(Boolean);
 }
 
-async function isAdmin(userId: number, bootstrap = false): Promise<boolean> {
+async function isAdmin(userId: number): Promise<boolean> {
   const fromEnv = process.env["BOT_ADMIN_IDS"] ?? "";
   const fromDb = await getSetting("bot_admin_ids");
   const ids = adminIdList(fromEnv, fromDb);
-  // Bootstrap: hech qanday admin sozlanmagan bo'lsa, birinchi /admin bosgan foydalanuvchi admin bo'ladi.
-  if (ids.length === 0 && bootstrap) {
-    await setSetting("bot_admin_ids", String(userId));
-    return true;
-  }
   return ids.includes(String(userId));
 }
 
@@ -191,7 +196,6 @@ const BTN = {
 function replyKeyboard(admin: boolean) {
   return {
     keyboard: [
-      [{ text: BTN.shop, web_app: { url: appUrl() } }],
       [{ text: BTN.sell }, { text: BTN.orders }],
       [{ text: BTN.rules }, { text: BTN.profile }],
       [{ text: BTN.about }, { text: BTN.contact }],
@@ -247,6 +251,7 @@ function adminKeyboard() {
       ...EDITABLE.map((item) => [{ text: item.label, callback_data: `edit:${item.key}` }]),
       [
         { text: "📊 Statistika", callback_data: "stats" },
+        { text: "📋 Loglar", callback_data: "logs" },
         { text: "🔁 Webhook", callback_data: "rewebhook" },
       ],
       [{ text: "✖️ Yopish", callback_data: "close" }],
@@ -271,17 +276,24 @@ async function subscriptionGate(chatId: number, userId: number): Promise<boolean
   const raw = await getSetting("bot_channel");
   const username = channelUsername(raw);
   const link = tgLink(raw);
-  if (!username || !link) return true;
+  if (!username || !link) {
+    botLog.warn("subscription_config_invalid", { channel: raw });
+    return true;
+  }
 
   try {
     const res = (await tg("getChatMember", { chat_id: username, user_id: userId })) as {
       ok?: boolean;
       result?: { status?: string };
     };
-    if (res.ok === false) return true; // bot kanalda admin emas — bloklamaymiz
+    if (res.ok === false) {
+      botLog.warn("subscription_check_unavailable", { userId, channel: username });
+      return true; // bot kanalda admin emas — botni to'xtatmaymiz
+    }
     const status = res.result?.status ?? "left";
     if (["creator", "administrator", "member", "restricted"].includes(status)) return true;
-  } catch {
+  } catch (error) {
+    botLog.warn("subscription_check_failed", { userId, channel: username, error: String(error) });
     return true;
   }
 
@@ -420,6 +432,10 @@ type Update = {
 
 export async function handleUpdate(update: Update) {
   try {
+    if (!(await claimUpdate(update.update_id))) {
+      botLog.info("duplicate_update_skipped", { updateId: update.update_id });
+      return;
+    }
     if (update.callback_query) return await handleCallback(update.callback_query);
     await handleMessage(update);
   } catch (error) {
@@ -457,7 +473,7 @@ async function handleMessage(update: Update) {
     return;
   }
 
-  if (command === "/start" || command === "/menu" || command === "/help") {
+  if (command === "/start" || command === "/restart") {
     await setPendingEdit(chatId, null);
     if (!admin && !(await subscriptionGate(chatId, userId))) return;
     await showMain(chatId, userId, name);
@@ -472,7 +488,7 @@ async function handleMessage(update: Update) {
     return;
   }
   if (command === "/admin" || command === "/panel" || text === BTN.admin) {
-    if (!(await isAdmin(userId, true))) {
+    if (!(await isAdmin(userId))) {
       await send(chatId, "⛔️ Bu bo'lim faqat adminlar uchun.");
       return;
     }
@@ -614,6 +630,19 @@ async function handleCallback(cb: NonNullable<Update["callback_query"]>) {
     return;
   }
 
+  if (data === "logs") {
+    const logs = await recentLogs();
+    const lines = logs.map((log) => {
+      const icon = log.level === "error" ? "🔴" : log.level === "warn" ? "🟠" : "🟢";
+      const time = new Date(log.created_at).toLocaleString("uz-UZ", { timeZone: "Asia/Tashkent" });
+      return `${icon} <code>${escapeHtml(time)}</code> · <b>${escapeHtml(log.event)}</b>${log.message ? `\n${escapeHtml(log.message)}` : ""}`;
+    });
+    await send(chatId, `📋 <b>SO'NGGI BOT LOGLARI</b>\n━━━━━━━━━━━━━━━━━━\n${lines.join("\n\n") || "Loglar hali yo'q."}`, {
+      reply_markup: adminKeyboard(),
+    });
+    return;
+  }
+
   if (data.startsWith("edit:")) {
     const key = data.slice(5);
     const item = EDITABLE.find((entry) => entry.key === key);
@@ -640,13 +669,17 @@ let webhookEnsured = false;
 
 /** Railway domenidan foydalanib webhookni avtomatik ro'yxatdan o'tkazadi. */
 export async function ensureWebhook(origin?: string) {
-  if (webhookEnsured) return;
+  if (webhookEnsured) return true;
   webhookEnsured = true;
   try {
-    if (!process.env["TELEGRAM_BOT_TOKEN"]) return;
+    if (!process.env["TELEGRAM_BOT_TOKEN"]) {
+      webhookEnsured = false;
+      botLog.error("webhook_token_missing", new Error("TELEGRAM_BOT_TOKEN is not configured"));
+      return false;
+    }
     const base = normalizeUrl(origin) ?? appUrl();
     const url = `${base}/api/public/telegram/webhook`;
-    const secret = process.env["TELEGRAM_WEBHOOK_SECRET"];
+    const secret = webhookSecret();
     const info = (await tg("getWebhookInfo", {})) as { result?: { url?: string } };
     if (info.result?.url !== url) {
       await tg("setWebhook", {
@@ -660,18 +693,17 @@ export async function ensureWebhook(origin?: string) {
     await tg("setMyCommands", {
       commands: [
         { command: "start", description: "🎮 Bosh menyu" },
-        { command: "qoidalar", description: "📜 Qoidalar" },
-        { command: "menu", description: "🏠 Menyuni ko'rsatish" },
-        { command: "id", description: "🆔 Telegram ID" },
-        { command: "help", description: "ℹ️ Yordam" },
+        { command: "restart", description: "🔄 Botni qayta ishga tushirish" },
       ],
     });
     await tg("setChatMenuButton", {
-      menu_button: { type: "web_app", text: "🎮 Magazin", web_app: { url: base } },
+      menu_button: { type: "commands" },
     });
+    return true;
   } catch (error) {
     webhookEnsured = false;
     botLog.error("webhook_ensure_failed", error);
+    return false;
   }
 }
 

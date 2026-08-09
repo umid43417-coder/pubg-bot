@@ -6,14 +6,16 @@ export const Route = createFileRoute("/api/public/telegram/webhook")({
       POST: async ({ request }) => {
         const { botLog } = await import("@/lib/bot/logger.server");
         try {
-          const secret = process.env["TELEGRAM_WEBHOOK_SECRET"];
-          if (secret && request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== secret) {
+          const { handleUpdate, webhookSecret } = await import("@/lib/bot/bot.server");
+          const secret = webhookSecret();
+          if (!secret || request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== secret) {
             botLog.warn("webhook_unauthorized");
             return new Response("Unauthorized", { status: 401 });
           }
 
+          const contentLength = Number(request.headers.get("content-length") ?? "0");
+          if (contentLength > 1_000_000) return new Response("Payload too large", { status: 413 });
           const update = await request.json();
-          const { handleUpdate } = await import("@/lib/bot/bot.server");
           await handleUpdate(update);
           return Response.json({ ok: true });
         } catch (error) {

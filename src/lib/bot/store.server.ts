@@ -7,7 +7,6 @@ import { botLog } from "./logger.server";
  */
 
 const memory = new Map<string, string>();
-let dbBroken = false;
 
 async function db() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -16,7 +15,6 @@ async function db() {
 
 export async function storeGet(key: string): Promise<string | null> {
   if (memory.has(key)) return memory.get(key) ?? null;
-  if (dbBroken) return null;
   try {
     const client = await db();
     const { data, error } = await client
@@ -29,7 +27,6 @@ export async function storeGet(key: string): Promise<string | null> {
     if (value) memory.set(key, value);
     return value || null;
   } catch (error) {
-    dbBroken = true;
     botLog.warn("store_read_fallback", { key, error: String(error) });
     return null;
   }
@@ -43,7 +40,6 @@ export async function storeSet(key: string, value: string) {
       .from("app_settings")
       .upsert({ key, value, updated_at: new Date().toISOString() });
     if (error) throw error;
-    dbBroken = false;
   } catch (error) {
     botLog.warn("store_write_fallback", { key, error: String(error) });
   }
@@ -61,5 +57,39 @@ export async function storeCount(
     return count ?? 0;
   } catch {
     return 0;
+  }
+}
+
+export async function claimUpdate(updateId?: number): Promise<boolean> {
+  if (typeof updateId !== "number") return true;
+  const key = `update:${updateId}`;
+  if (memory.has(key)) return false;
+  memory.set(key, "1");
+
+  try {
+    const client = await db();
+    const { error } = await client.from("bot_updates").insert({ update_id: updateId });
+    if (!error) return true;
+    if (error.code === "23505") return false;
+    if (error.code !== "42P01") botLog.warn("update_dedupe_failed", { updateId, error: error.message });
+  } catch (error) {
+    botLog.warn("update_dedupe_fallback", { updateId, error: String(error) });
+  }
+  return true;
+}
+
+export async function recentLogs(limit = 12) {
+  try {
+    const client = await db();
+    const { data, error } = await client
+      .from("bot_logs")
+      .select("level,event,message,created_at")
+      .order("created_at", { ascending: false })
+      .limit(Math.min(Math.max(limit, 1), 30));
+    if (error) throw error;
+    return data ?? [];
+  } catch (error) {
+    botLog.warn("logs_read_failed", { error: String(error) });
+    return [];
   }
 }
