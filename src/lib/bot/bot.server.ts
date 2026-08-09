@@ -15,7 +15,7 @@ export function appUrl() {
   return (
     normalizeUrl(process.env["PUBLIC_APP_URL"]) ??
     normalizeUrl(process.env["RAILWAY_PUBLIC_DOMAIN"]) ??
-    "https://pubg-bot-production.up.railway.app"
+    "https://pubg-bot-production-21d9.up.railway.app"
   );
 }
 
