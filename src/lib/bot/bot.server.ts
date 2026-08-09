@@ -694,7 +694,16 @@ export async function ensureWebhook(origin?: string) {
       botLog.error("webhook_token_missing", new Error("TELEGRAM_BOT_TOKEN is not configured"));
       return false;
     }
-    const base = normalizeUrl(origin) ?? appUrl();
+    const candidate = normalizeUrl(origin);
+    const usable =
+      candidate &&
+      candidate.startsWith("https://") &&
+      !candidate.includes("healthcheck.railway.app") &&
+      !candidate.includes("localhost")
+        ? candidate
+        : null;
+    // Configured public URL wins; request origin is only a fallback.
+    const base = normalizeUrl(process.env["PUBLIC_APP_URL"]) ?? usable ?? appUrl();
     const url = `${base}/api/public/telegram/webhook`;
     const secret = webhookSecret();
     const info = (await tg("getWebhookInfo", {})) as { result?: { url?: string } };
