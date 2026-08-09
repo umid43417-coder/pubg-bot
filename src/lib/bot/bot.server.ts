@@ -95,7 +95,11 @@ async function isAdmin(userId: number): Promise<boolean> {
 const stateKey = (chatId: number) => `bot_state:${chatId}`;
 
 async function setPendingEdit(chatId: number, key: string | null) {
-  await setSetting(stateKey(chatId), key ?? "");
+  try {
+    await setSetting(stateKey(chatId), key ?? "");
+  } catch (error) {
+    botLog.error("pending_edit_failed", error, { chatId });
+  }
 }
 
 async function getPendingEdit(chatId: number): Promise<string> {
@@ -141,9 +145,16 @@ const shopButton = { inline_keyboard: [[{ text: "🛒 Magazinni ochish", web_app
 /* ------------------------------------------------------------------ screens */
 
 async function showMain(chatId: number, userId: number, name: string) {
-  const welcome = await getSetting("bot_welcome");
+  let welcome = SETTING_DEFAULTS["bot_welcome"]!;
+  let admin = false;
+  try {
+    welcome = await getSetting("bot_welcome");
+    admin = await isAdmin(userId);
+  } catch (error) {
+    botLog.error("main_menu_settings_failed", error, { chatId });
+  }
   await send(chatId, `${welcome}\n\nSalom, <b>${escapeHtml(name)}</b>!`, {
-    reply_markup: mainKeyboard(await isAdmin(userId)),
+    reply_markup: mainKeyboard(admin),
   });
   await send(chatId, "Magazinni shu yerdan oching 👇", { reply_markup: shopButton });
 }
@@ -216,6 +227,8 @@ export async function handleUpdate(update: Update) {
   if (!chatId || !userId) return;
 
   const text = (message?.text ?? "").trim();
+  // "/start ref123" kabi argumentli buyruqlarni ham tushunadi
+  const command = text.split(/\s+/)[0]?.toLowerCase() ?? "";
   const name = message?.from?.first_name ?? "gamer";
   botLog.info("message", { chatId, userId, text: text.slice(0, 64) });
 
@@ -233,8 +246,12 @@ export async function handleUpdate(update: Update) {
     return;
   }
 
+  if (command === "/start" || command === "/menu" || command === "/help") {
+    await showMain(chatId, userId, name);
+    return;
+  }
+
   switch (text) {
-    case "/start":
     case BTN.home:
       await showMain(chatId, userId, name);
       return;
@@ -255,6 +272,7 @@ export async function handleUpdate(update: Update) {
       return;
     case BTN.admin:
     case "/admin":
+    case "/panel":
       if (!(await isAdmin(userId))) {
         botLog.warn("admin_denied", { userId });
         await send(chatId, "⛔️ Bu bo'lim faqat adminlar uchun.");

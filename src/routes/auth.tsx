@@ -37,7 +37,6 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("+998");
   const [code, setCode] = useState("");
-  const [codeSent, setCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -90,29 +89,43 @@ function AuthPage() {
     }
   }
 
-  async function sendCode(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    const { error } = await supabase.auth.signInWithOtp({ phone: phone.replace(/\s/g, "") });
-    setBusy(false);
-    if (error) toast.error(error.message);
-    else {
-      setCodeSent(true);
-      toast.success("SMS kod yuborildi");
-    }
+  function phoneEmail(raw: string) {
+    const digits = raw.replace(/\D/g, "");
+    return `p${digits}@pubgmarket.app`;
   }
 
-  async function verifyCode(e: React.FormEvent) {
+  // Telefon raqam + parol (SMS provayder talab qilinmaydi).
+  async function phoneAuth(e: React.FormEvent) {
     e.preventDefault();
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 9) {
+      toast.error("Telefon raqamni to'liq kiriting");
+      return;
+    }
+    if (code.length < 6) {
+      toast.error("Parol kamida 6 ta belgidan iborat bo'lsin");
+      return;
+    }
     setBusy(true);
-    const { error } = await supabase.auth.verifyOtp({
-      phone: phone.replace(/\s/g, ""),
-      token: code,
-      type: "sms",
+    const synthetic = phoneEmail(phone);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: synthetic,
+      password: code,
+    });
+    if (!error) {
+      setBusy(false);
+      toast.success(t("welcome"));
+      return;
+    }
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email: synthetic,
+      password: code,
+      options: { data: { phone: `+${digits}` } },
     });
     setBusy(false);
-    if (error) toast.error(error.message);
-    else toast.success(t("welcome"));
+    if (signUpError) toast.error(signUpError.message);
+    else if (!data.session) toast.error("Hisob yaratildi, lekin tasdiqlash kerak. Admin bilan bog'laning.");
+    else toast.success(t("account_created"));
   }
 
   return (
@@ -181,7 +194,7 @@ function AuthPage() {
             ))}
 
             <TabsContent value="phone" className="mt-4">
-              <form onSubmit={codeSent ? verifyCode : sendCode} className="space-y-4">
+              <form onSubmit={phoneAuth} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="phone">Telefon raqam</Label>
                   <Input
@@ -193,23 +206,25 @@ function AuthPage() {
                     placeholder="+998901234567"
                   />
                 </div>
-                {codeSent ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="code">SMS kod</Label>
-                    <Input
-                      id="code"
-                      inputMode="numeric"
-                      required
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      placeholder="123456"
-                    />
-                  </div>
-                ) : null}
+                <div className="space-y-2">
+                  <Label htmlFor="phone-pass">Parol</Label>
+                  <Input
+                    id="phone-pass"
+                    type="password"
+                    required
+                    minLength={6}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="••••••"
+                  />
+                </div>
                 <Button type="submit" disabled={busy} className="w-full font-bold">
                   {busy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                  {codeSent ? "Tasdiqlash" : "Kod yuborish"}
+                  Kirish / Ro'yxatdan o'tish
                 </Button>
+                <p className="text-center text-xs text-muted-foreground">
+                  Birinchi marta kirsangiz hisob avtomatik yaratiladi.
+                </p>
               </form>
             </TabsContent>
           </Tabs>

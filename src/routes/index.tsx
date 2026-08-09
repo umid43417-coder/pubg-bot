@@ -187,13 +187,13 @@ function Home() {
       </div>
 
       {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-64 rounded-xl" />
           ))}
         </div>
       ) : list.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
           {list.map((a) => (
             <AccountCard key={a.id} account={a} />
           ))}
