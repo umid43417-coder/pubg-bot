@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PUBG_SECTIONS } from "@/lib/pubg-spec";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export const Route = createFileRoute("/sotish")({
   head: () => ({
@@ -110,6 +112,18 @@ function SellPage() {
         upload(images, user.id),
         upload(videos, user.id),
       ]);
+      // To'liq PUBG ma'lumotlari (d.<bo'lim>.<maydon>) -> details JSONB
+      const details: Record<string, Record<string, string | number | boolean>> = {};
+      for (const [rawKey, rawValue] of fd.entries()) {
+        if (!rawKey.startsWith("d.")) continue;
+        const [, section, key] = rawKey.split(".");
+        if (!section || !key) continue;
+        const value = typeof rawValue === "string" ? rawValue.trim() : "";
+        if (!value) continue;
+        details[section] ??= {};
+        details[section][key] = value === "on" ? true : value;
+      }
+
       const { error } = await supabase.from("accounts").insert({
         user_id: user.id,
         title: String(fd.get("title")),
@@ -130,7 +144,8 @@ function SellPage() {
         contact: String(fd.get("contact") || ""),
         images: imagePaths,
         videos: videoPaths,
-      });
+        details,
+      } as never);
       if (error) throw error;
       await queryClient.invalidateQueries({ queryKey: ["accounts"] });
       toast.success("E'lon joylandi!");
@@ -192,6 +207,63 @@ function SellPage() {
           <div className="space-y-2">
             <Label htmlFor="description">{t("f_description")}</Label>
             <Textarea id="description" name="description" rows={5} placeholder={t("desc_ph")} />
+          </div>
+        </section>
+
+        <section className="panel space-y-3 p-4">
+          <h2 className="text-base font-bold">🎮 To'liq PUBG ma'lumotlari</h2>
+          <p className="text-xs text-muted-foreground">
+            Faqat bilganingizni to'ldiring — bo'sh maydonlar e'londa ko'rinmaydi.
+          </p>
+          <div className="space-y-2">
+            {PUBG_SECTIONS.map((section) => (
+              <details
+                key={section.id}
+                className="rounded-xl border border-border/70 bg-card/40 px-3 py-2"
+              >
+                <summary className="cursor-pointer list-none text-sm font-bold">
+                  <span className="mr-1">{section.icon}</span>
+                  {section.title}
+                </summary>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {section.fields.map((f) => {
+                    const name = `d.${section.id}.${f.key}`;
+                    if (f.type === "bool") {
+                      return (
+                        <label
+                          key={f.key}
+                          htmlFor={name}
+                          className="flex min-w-0 items-center gap-2 rounded-lg border border-border/60 px-3 py-2 text-xs"
+                        >
+                          <Checkbox id={name} name={name} />
+                          <span className="min-w-0 truncate">
+                            {f.icon} {f.label}
+                          </span>
+                        </label>
+                      );
+                    }
+                    return (
+                      <div key={f.key} className="min-w-0 space-y-1">
+                        <Label htmlFor={name} className="text-xs">
+                          {f.icon} {f.label}
+                        </Label>
+                        {f.type === "textarea" ? (
+                          <Textarea id={name} name={name} rows={3} placeholder={f.ph} />
+                        ) : (
+                          <Input
+                            id={name}
+                            name={name}
+                            type={f.type === "number" ? "number" : "text"}
+                            inputMode={f.type === "number" ? "numeric" : undefined}
+                            placeholder={f.ph}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            ))}
           </div>
         </section>
 

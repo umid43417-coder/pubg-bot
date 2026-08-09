@@ -16,6 +16,9 @@ import { Route as MeningRouteImport } from './routes/mening'
 import { Route as QoidalarRouteImport } from './routes/qoidalar'
 import { Route as SotishRouteImport } from './routes/sotish'
 import { Route as AkkauntIdRouteImport } from './routes/akkaunt.$id'
+import { Route as ApiPublicDiagRouteImport } from './routes/api/public/diag'
+import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
+import { Route as ApiPublicTgLoginRouteImport } from './routes/api/public/tg-login'
 import { Route as ApiPublicTelegramSetupRouteImport } from './routes/api/public/telegram/setup'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 
@@ -54,6 +57,21 @@ const AkkauntIdRoute = AkkauntIdRouteImport.update({
   path: '/akkaunt/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicDiagRoute = ApiPublicDiagRouteImport.update({
+  id: '/api/public/diag',
+  path: '/api/public/diag',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicHealthRoute = ApiPublicHealthRouteImport.update({
+  id: '/api/public/health',
+  path: '/api/public/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicTgLoginRoute = ApiPublicTgLoginRouteImport.update({
+  id: '/api/public/tg-login',
+  path: '/api/public/tg-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicTelegramSetupRoute = ApiPublicTelegramSetupRouteImport.update({
   id: '/api/public/telegram/setup',
   path: '/api/public/telegram/setup',
@@ -74,6 +92,9 @@ export interface FileRoutesByFullPath {
   '/qoidalar': typeof QoidalarRoute
   '/sotish': typeof SotishRoute
   '/akkaunt/$id': typeof AkkauntIdRoute
+  '/api/public/diag': typeof ApiPublicDiagRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
+  '/api/public/tg-login': typeof ApiPublicTgLoginRoute
   '/api/public/telegram/setup': typeof ApiPublicTelegramSetupRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
@@ -85,6 +106,9 @@ export interface FileRoutesByTo {
   '/qoidalar': typeof QoidalarRoute
   '/sotish': typeof SotishRoute
   '/akkaunt/$id': typeof AkkauntIdRoute
+  '/api/public/diag': typeof ApiPublicDiagRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
+  '/api/public/tg-login': typeof ApiPublicTgLoginRoute
   '/api/public/telegram/setup': typeof ApiPublicTelegramSetupRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
@@ -97,6 +121,9 @@ export interface FileRoutesById {
   '/qoidalar': typeof QoidalarRoute
   '/sotish': typeof SotishRoute
   '/akkaunt/$id': typeof AkkauntIdRoute
+  '/api/public/diag': typeof ApiPublicDiagRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
+  '/api/public/tg-login': typeof ApiPublicTgLoginRoute
   '/api/public/telegram/setup': typeof ApiPublicTelegramSetupRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
@@ -110,6 +137,9 @@ export interface FileRouteTypes {
     | '/qoidalar'
     | '/sotish'
     | '/akkaunt/$id'
+    | '/api/public/diag'
+    | '/api/public/health'
+    | '/api/public/tg-login'
     | '/api/public/telegram/setup'
     | '/api/public/telegram/webhook'
   fileRoutesByTo: FileRoutesByTo
@@ -121,6 +151,9 @@ export interface FileRouteTypes {
     | '/qoidalar'
     | '/sotish'
     | '/akkaunt/$id'
+    | '/api/public/diag'
+    | '/api/public/health'
+    | '/api/public/tg-login'
     | '/api/public/telegram/setup'
     | '/api/public/telegram/webhook'
   id:
@@ -132,6 +165,9 @@ export interface FileRouteTypes {
     | '/qoidalar'
     | '/sotish'
     | '/akkaunt/$id'
+    | '/api/public/diag'
+    | '/api/public/health'
+    | '/api/public/tg-login'
     | '/api/public/telegram/setup'
     | '/api/public/telegram/webhook'
   fileRoutesById: FileRoutesById
@@ -144,6 +180,9 @@ export interface RootRouteChildren {
   QoidalarRoute: typeof QoidalarRoute
   SotishRoute: typeof SotishRoute
   AkkauntIdRoute: typeof AkkauntIdRoute
+  ApiPublicDiagRoute: typeof ApiPublicDiagRoute
+  ApiPublicHealthRoute: typeof ApiPublicHealthRoute
+  ApiPublicTgLoginRoute: typeof ApiPublicTgLoginRoute
   ApiPublicTelegramSetupRoute: typeof ApiPublicTelegramSetupRoute
   ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
 }
@@ -199,6 +238,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AkkauntIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/diag': {
+      id: '/api/public/diag'
+      path: '/api/public/diag'
+      fullPath: '/api/public/diag'
+      preLoaderRoute: typeof ApiPublicDiagRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/health': {
+      id: '/api/public/health'
+      path: '/api/public/health'
+      fullPath: '/api/public/health'
+      preLoaderRoute: typeof ApiPublicHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/tg-login': {
+      id: '/api/public/tg-login'
+      path: '/api/public/tg-login'
+      fullPath: '/api/public/tg-login'
+      preLoaderRoute: typeof ApiPublicTgLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/telegram/setup': {
       id: '/api/public/telegram/setup'
       path: '/api/public/telegram/setup'
@@ -224,6 +284,9 @@ const rootRouteChildren: RootRouteChildren = {
   QoidalarRoute: QoidalarRoute,
   SotishRoute: SotishRoute,
   AkkauntIdRoute: AkkauntIdRoute,
+  ApiPublicDiagRoute: ApiPublicDiagRoute,
+  ApiPublicHealthRoute: ApiPublicHealthRoute,
+  ApiPublicTgLoginRoute: ApiPublicTgLoginRoute,
   ApiPublicTelegramSetupRoute: ApiPublicTelegramSetupRoute,
   ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,
 }

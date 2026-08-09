@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { LanguageProvider } from "@/lib/i18n";
+import { TelegramViewport } from "@/components/TelegramViewport";
 
 function NotFoundComponent() {
   return (
@@ -95,7 +96,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      {
+        name: "viewport",
+        content:
+          "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+      },
+      { name: "theme-color", content: "#0b0f1a" },
       { title: "PUBG Market — akkaunt magazin" },
       {
         name: "description",
@@ -124,7 +130,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     scripts: (() => {
       const cfg = publicSupabaseConfig();
-      return cfg ? [{ children: `window.__SB__=${JSON.stringify(cfg)}` }] : [];
+      return [
+        { src: "https://telegram.org/js/telegram-web-app.js" },
+        ...(cfg ? [{ children: `window.__SB__=${JSON.stringify(cfg)}` }] : []),
+      ];
     })(),
   }),
   shellComponent: RootShell,
@@ -153,6 +162,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
+        <TelegramViewport />
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
         <Toaster />

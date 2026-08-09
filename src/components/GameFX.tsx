@@ -58,7 +58,7 @@ const sparks = Array.from({ length: 14 }, (_, i) => ({
 /** Animated gamer battlefield backdrop: slow ken-burns image + rising sparks. */
 export function GamerBackdrop() {
   return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
+    <div className="fx-backdrop overflow-hidden" aria-hidden="true">
       <img
         src={gamerBg}
         alt=""

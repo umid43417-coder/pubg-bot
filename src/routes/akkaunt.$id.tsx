@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { filledFields, filledSections, formatValue, type AccountDetails } from "@/lib/pubg-spec";
 
 export const Route = createFileRoute("/akkaunt/$id")({
   head: () => ({
@@ -120,6 +121,8 @@ function AccountPage() {
               })}
             </div>
 
+            <PubgDetails details={(account as { details?: AccountDetails }).details ?? null} />
+
             <div className="panel space-y-3 p-5">
               <p className="flex items-center gap-2 text-sm font-bold text-accent">
                 <ShieldCheck className="size-4" /> {t("buy_via_admin")}
@@ -146,5 +149,43 @@ function AccountPage() {
         </div>
       )}
     </AppShell>
+  );
+}
+
+/** To'liq PUBG ma'lumotlari — ixcham, mobil uchun ochiladigan bo'limlar. */
+function PubgDetails({ details }: { details?: AccountDetails | null }) {
+  const sections = filledSections(details ?? {});
+  if (!sections.length) return null;
+
+  return (
+    <div className="panel space-y-2 p-3">
+      <h2 className="px-1 text-sm font-bold">🎮 To'liq ma'lumotlar</h2>
+      {sections.map((section) => {
+        const items = filledFields(section, details ?? {});
+        return (
+          <details key={section.id} className="rounded-xl border border-border/70 bg-card/40 px-3 py-2">
+            <summary className="grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-sm font-bold">
+              <span className="min-w-0 truncate">
+                {section.icon} {section.title}
+              </span>
+              <Badge className="shrink-0">{items.length}</Badge>
+            </summary>
+            <dl className="mt-2 divide-y divide-border/60">
+              {items.map(({ field, value }) => (
+                <div
+                  key={field.key}
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-2"
+                >
+                  <dt className="min-w-0 truncate text-xs text-muted-foreground">
+                    {field.icon} {field.label}
+                  </dt>
+                  <dd className="shrink-0 text-xs font-bold">{formatValue(field, value)}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+        );
+      })}
+    </div>
   );
 }

@@ -1,6 +1,14 @@
 import { botLog } from "./logger.server";
 import { claimUpdate, recentLogs, storeCount, storeGet, storeSet } from "./store.server";
 import { createHash } from "node:crypto";
+import {
+  filledFields,
+  filledSections,
+  formatValue,
+  isFilled,
+  sectionById,
+  type AccountDetails,
+} from "@/lib/pubg-spec";
 
 /* ------------------------------------------------------------------ config */
 
@@ -246,32 +254,30 @@ const getPendingEdit = async (chatId: number) => (await storeGet(stateKey(chatId
 /* --------------------------------------------------------------- keyboards */
 
 const BTN = {
-  sell: "🛒 Akkaunt sotish",
-  accounts: "🔍 Akkauntlar",
+  sell: "🛒 Sotish",
+  accounts: "🔍 Bozor",
   guarantee: "🛡 Kafolat",
-  profile: "👤 Mening profilim",
-  orders: "📋 Buyurtmalarim",
-  contact: "🎧 Admin bilan aloqa",
-  payments: "💳 To'lov usullari",
-  bonus: "🎁 Bonuslar",
-  top: "🏆 Top sotuvchilar",
-  news: "📢 Yangiliklar",
-  rules: "👑 Qoidalar",
-  complaint: "⚠️ Shikoyat qilish",
-  home: "🏠 Bosh menyu",
-  admin: "🛠 Admin panel",
+  profile: "👤 Profil",
+  orders: "📋 Buyurtma",
+  contact: "🎧 Admin",
+  payments: "💳 To'lov",
+  bonus: "🎁 Bonus",
+  top: "🏆 Top",
+  news: "📢 Yangilik",
+  rules: "📜 Qoida",
+  complaint: "🚨 Shikoyat",
+  home: "🏠 Menyu",
+  admin: "🛠 Panel",
 };
 
 function replyKeyboard(admin: boolean) {
   return {
     keyboard: [
-      [{ text: BTN.sell }, { text: BTN.accounts }],
-      [{ text: BTN.guarantee }, { text: BTN.profile }],
-      [{ text: BTN.orders }, { text: BTN.contact }],
-      [{ text: BTN.payments }, { text: BTN.bonus }],
-      [{ text: BTN.top }, { text: BTN.news }],
-      [{ text: BTN.rules }, { text: BTN.complaint }],
-      ...(admin ? [[{ text: BTN.admin }]] : []),
+      [{ text: BTN.accounts }, { text: BTN.sell }, { text: BTN.profile }],
+      [{ text: BTN.guarantee }, { text: BTN.orders }, { text: BTN.contact }],
+      [{ text: BTN.payments }, { text: BTN.bonus }, { text: BTN.top }],
+      [{ text: BTN.news }, { text: BTN.rules }, { text: BTN.complaint }],
+      ...(admin ? [[{ text: BTN.admin }, { text: BTN.home }]] : [[{ text: BTN.home }]]),
     ],
     resize_keyboard: true,
     is_persistent: true,
@@ -281,42 +287,41 @@ function replyKeyboard(admin: boolean) {
 
 type Row = { text: string; web_app?: { url: string }; url?: string; callback_data?: string }[];
 
+/** Asosiy menyu — telefonda ham ixcham (qisqa nomlar, 3 tagacha ustun). */
 async function mainInline(admin: boolean): Promise<{ inline_keyboard: Row[] }> {
   const base = appUrl();
   const support = tgLink(await getSetting("bot_support"));
 
   const rows: Row[] = [
-    [{ text: "🎮 MAGAZINNI OCHISH (Mini App)", web_app: { url: base } }],
+    [{ text: "🎮 MAGAZIN — MINI APP", web_app: { url: base } }],
     [
-      { text: "🛒 1. Akkaunt sotish", web_app: { url: `${base}/sotish` } },
-      { text: "🔍 2. Akkauntlar", web_app: { url: base } },
+      { text: "🔍 Bozor", callback_data: "accounts" },
+      { text: "🛒 Sotish", callback_data: "sell" },
+      { text: "👤 Profil", callback_data: "profile" },
     ],
     [
-      { text: "🛡 3. Kafolat", callback_data: "guarantee" },
-      { text: "👤 4. Mening profilim", callback_data: "profile" },
+      { text: "🛡 Kafolat", callback_data: "guarantee" },
+      { text: "📋 Buyurtma", callback_data: "orders" },
+      { text: "🎧 Admin", callback_data: "contact" },
     ],
     [
-      { text: "📋 5. Buyurtmalarim", callback_data: "orders" },
-      { text: "🎧 6. Admin bilan aloqa", callback_data: "contact" },
+      { text: "💳 To'lov", callback_data: "payments" },
+      { text: "🎁 Bonus", callback_data: "bonus" },
+      { text: "🏆 Top", callback_data: "top" },
     ],
     [
-      { text: "💳 7. To'lov usullari", callback_data: "payments" },
-      { text: "🎁 8. Bonuslar", callback_data: "bonus" },
+      { text: "📢 Yangilik", callback_data: "news" },
+      { text: "📜 Qoida", callback_data: "rules" },
+      { text: "🚨 Shikoyat", callback_data: "complaint" },
     ],
-    [
-      { text: "🏆 9. Top sotuvchilar", callback_data: "top" },
-      { text: "📢 10. Yangiliklar", callback_data: "news" },
-    ],
-    [
-      { text: "👑 11. Qoidalar", callback_data: "rules" },
-      { text: "⚠️ 12. Shikoyat qilish", callback_data: "complaint" },
-    ],
+    [{ text: "⌨️ Tez menyu (tugmalar)", callback_data: "kb" }],
   ];
 
   if (support) rows.push([{ text: "👑 ADMIN BILAN BOG'LANISH", url: support }]);
   if (admin) rows.push([{ text: "🛠 Admin panel", callback_data: "admin" }]);
   return { inline_keyboard: rows };
 }
+
 
 function adminKeyboard() {
   return {
@@ -396,18 +401,62 @@ async function subscriptionGate(chatId: number, userId: number): Promise<boolean
 
 /* ----------------------------------------------------------------- screens */
 
+/** Menyu tugmasini (input yonidagi) Mini App qilib qo'yamiz — bir marta. */
+let menuButtonSet = false;
+async function ensureMenuButton() {
+  if (menuButtonSet) return;
+  menuButtonSet = true;
+  await tg("setChatMenuButton", {
+    menu_button: { type: "web_app", text: "🎮 Magazin", web_app: { url: appUrl() } },
+  }).catch(() => {});
+  await tg("setMyCommands", {
+    commands: [
+      { command: "start", description: "🎮 Bosh menyu" },
+      { command: "bozor", description: "🔍 Akkauntlar bozori" },
+      { command: "sotish", description: "🛒 Akkaunt sotish" },
+      { command: "menyu", description: "⌨️ Tugmalar menyusi" },
+      { command: "qoidalar", description: "📜 Qoidalar" },
+      { command: "id", description: "🆔 Telegram ID" },
+    ],
+  }).catch(() => {});
+}
+
+/** /start — FAQAT BITTA xabar: rasm + matn + ixcham menyu. */
 async function showMain(chatId: number, userId: number, name: string) {
   const welcome = await getSetting("bot_welcome");
   const admin = await isAdmin(userId);
-  await send(chatId, "🎮 <b>Menyu tayyor</b> — pastdagi tugmalardan foydalaning 👇", {
+  await ensureMenuButton();
+
+  const caption = [
+    welcome,
+    "",
+    `👋 Salom, <b>${escapeHtml(name)}</b>! Omad tilaymiz — <b>GG</b> 🔥`,
+    "",
+    "⬇️ Kerakli bo'limni tanlang:",
+  ].join("\n");
+
+  const reply_markup = await mainInline(admin);
+  const photo = `${appUrl()}/pubg-hero.jpg`;
+
+  const res = await tg("sendPhoto", {
+    chat_id: chatId,
+    photo,
+    caption,
+    parse_mode: "HTML",
+    reply_markup,
+  });
+  if (res.ok === false) {
+    await send(chatId, caption, { reply_markup });
+  }
+}
+
+/** Pastdagi (tashqi) tugmalar menyusi */
+async function showKeyboard(chatId: number, admin: boolean) {
+  await send(chatId, "⌨️ <b>Tez menyu yoqildi</b> — pastdagi tugmalardan foydalaning 👇", {
     reply_markup: replyKeyboard(admin),
   });
-  await send(
-    chatId,
-    `${welcome}\n\n👋 Salom, <b>${escapeHtml(name)}</b>! Omad tilaymiz — <b>GG</b> 🔥`,
-    { reply_markup: await mainInline(admin) },
-  );
 }
+
 
 async function showRules(chatId: number) {
   const rules = await getSetting("bot_rules");
@@ -451,45 +500,322 @@ async function showSell(chatId: number) {
   );
 }
 
+type AccountRow = {
+  id: string;
+  title: string;
+  price: number;
+  currency: string;
+  level: number | null;
+  sold: boolean;
+  description?: string | null;
+  contact?: string | null;
+  images?: string[] | null;
+  videos?: string[] | null;
+  details?: AccountDetails | null;
+};
+
+async function loadAccounts(limit = 10): Promise<AccountRow[]> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin
+    .from("accounts")
+    .select("*")
+    .eq("sold", false)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (data ?? []) as unknown as AccountRow[];
+}
+
+async function loadAccount(id: string): Promise<AccountRow | null> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin.from("accounts").select("*").eq("id", id).maybeSingle();
+  return (data ?? null) as unknown as AccountRow | null;
+}
+
+function money(price: number, currency: string) {
+  return `${Number(price).toLocaleString("ru-RU")} ${currency === "UZS" ? "so'm" : currency}`;
+}
+
+function maskId(value: unknown) {
+  const raw = String(value ?? "").replace(/\D/g, "");
+  if (raw.length < 4) return "****";
+  return `****${raw.slice(-4)}`;
+}
+
+function pick(details: AccountDetails | null | undefined, section: string, key: string) {
+  const value = details?.[section]?.[key];
+  return isFilled(value) ? value : null;
+}
+
+/** E'lon kartasi — foydalanuvchi so'ragan ko'rinish. */
+function accountCaption(a: AccountRow) {
+  const d = a.details ?? {};
+  const line = (icon: string, label: string, value: unknown) =>
+    isFilled(value) ? `${icon} ${label}: <b>${escapeHtml(String(value))}</b>` : null;
+
+  const rows = [
+    "🎮 <b>PUBG MOBILE ACCOUNT</b>",
+    "━━━━━━━━━━━━━━━━━━",
+    `🏷 <b>${escapeHtml(a.title)}</b>`,
+    pick(d, "main", "pubg_id") ? `🆔 ID: <code>${maskId(pick(d, "main", "pubg_id"))}</code>` : null,
+    line("👤", "Nick", pick(d, "main", "nick")),
+    line("⭐", "Level", pick(d, "main", "level") ?? a.level),
+    line("🌍", "Server", pick(d, "main", "server")),
+    line("🏆", "Rank", pick(d, "main", "rank") ?? pick(d, "ranks", "highest_rank")),
+    line("🎫", "RP", pick(d, "rp", "count") ?? pick(d, "rp", "current")),
+    line("🔫", "Gun skin", pick(d, "inventory", "guns")),
+    line("💎", "Mythic", pick(d, "mythic", "mythic")),
+    line("👑", "X-Suit", pick(d, "mythic", "xsuit_count") ?? pick(d, "xsuit", "name")),
+    line("🚗", "Vehicle", pick(d, "inventory", "vehicle")),
+    line("🎒", "Backpack", pick(d, "inventory", "backpack")),
+    line("💎", "UC", pick(d, "uc", "now")),
+    line("🔥", "Popularity", pick(d, "main", "popularity")),
+    line("❤️", "Like", pick(d, "main", "likes")),
+    "",
+    `💰 <b>${money(a.price, a.currency)}</b>`,
+  ].filter(Boolean) as string[];
+
+  const badges = [
+    pick(d, "trust", "verified") ? "✅ Tekshirilgan" : null,
+    pick(d, "trust", "garant") ? "🛡️ Garant" : null,
+    pick(d, "trust", "trusted") ? "⭐ Ishonchli sotuvchi" : null,
+    (a.videos?.length ?? 0) > 0 || pick(d, "trust", "video") ? "🎥 Video bor" : null,
+  ].filter(Boolean);
+  if (badges.length) rows.push("", badges.join(" · "));
+
+  return rows.join("\n");
+}
+
+async function accountKeyboard(a: AccountRow) {
+  const base = appUrl();
+  const support = tgLink(await getSetting("bot_support"));
+  const sections = filledSections((a.details ?? {}) as AccountDetails);
+  const rows: Row[] = [];
+
+  for (let i = 0; i < sections.length; i += 2) {
+    rows.push(
+      sections.slice(i, i + 2).map((s) => ({
+        text: s.short,
+        callback_data: `sec:${a.id.slice(0, 8)}:${s.id}`,
+      })),
+    );
+  }
+
+  const media: Row = [];
+  if ((a.images?.length ?? 0) > 0) media.push({ text: "🖼 Rasmlar", callback_data: `img:${a.id.slice(0, 8)}` });
+  if ((a.videos?.length ?? 0) > 0) media.push({ text: "🎥 Video", callback_data: `vid:${a.id.slice(0, 8)}` });
+  if (media.length) rows.push(media);
+
+  rows.push([
+    { text: "❤️ Sevimli", callback_data: `fav:${a.id.slice(0, 8)}` },
+    { text: "⚖️ Solishtirish", callback_data: `cmp:${a.id.slice(0, 8)}` },
+  ]);
+  rows.push([{ text: "🔎 To'liq ko'rish (Mini App)", web_app: { url: `${base}/akkaunt/${a.id}` } }]);
+  if (support) {
+    rows.push([
+      { text: "🛡️ Garant orqali olish", url: support },
+      { text: "💬 Sotuvchiga yozish", url: support },
+    ]);
+  }
+  rows.push([
+    { text: "🚨 Shikoyat", callback_data: "complaint" },
+    { text: "🔍 Bozor", callback_data: "accounts" },
+    { text: "🏠 Menyu", callback_data: "home" },
+  ]);
+  return { inline_keyboard: rows };
+}
+
+const shortIds = new Map<string, string>();
+
+async function resolveId(short: string) {
+  const cached = shortIds.get(short);
+  if (cached) return cached;
+  const list = await loadAccounts(50);
+  for (const a of list) shortIds.set(a.id.slice(0, 8), a.id);
+  return shortIds.get(short) ?? null;
+}
+
+async function showAccountCard(chatId: number, short: string) {
+  const id = await resolveId(short);
+  const account = id ? await loadAccount(id) : null;
+  if (!account) {
+    await send(chatId, "❌ E'lon topilmadi yoki sotilgan.", { reply_markup: await shopInline() });
+    return;
+  }
+  const caption = accountCaption(account);
+  const reply_markup = await accountKeyboard(account);
+  const cover = (await signedMedia(account.images ?? []))[0];
+  if (cover) {
+    const res = await tg("sendPhoto", {
+      chat_id: chatId,
+      photo: cover,
+      caption,
+      parse_mode: "HTML",
+      reply_markup,
+    });
+    if (res.ok !== false) return;
+  }
+  await send(chatId, caption, { reply_markup });
+}
+
+async function signedMedia(paths: string[]) {
+  if (!paths.length) return [];
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin.storage
+      .from("account-media")
+      .createSignedUrls(paths.slice(0, 10), 60 * 60 * 6);
+    return (data ?? []).map((d) => d.signedUrl).filter(Boolean) as string[];
+  } catch (error) {
+    botLog.warn("sign_media_failed", { error: String(error) });
+    return [];
+  }
+}
+
+async function showAccountMedia(chatId: number, short: string, kind: "img" | "vid") {
+  const id = await resolveId(short);
+  const account = id ? await loadAccount(id) : null;
+  if (!account) return;
+  const paths = (kind === "img" ? account.images : account.videos) ?? [];
+  const urls = await signedMedia(paths);
+  if (!urls.length) {
+    await send(chatId, kind === "img" ? "🖼 Rasm yo'q." : "🎥 Video yo'q.");
+    return;
+  }
+  const media = urls.map((url, i) => ({
+    type: kind === "img" ? "photo" : "video",
+    media: url,
+    ...(i === 0 ? { caption: `${kind === "img" ? "🖼" : "🎥"} ${escapeHtml(account.title)}`, parse_mode: "HTML" } : {}),
+  }));
+  const res = await tg("sendMediaGroup", { chat_id: chatId, media });
+  if (res.ok === false) {
+    for (const url of urls.slice(0, 3)) {
+      await tg(kind === "img" ? "sendPhoto" : "sendVideo", {
+        chat_id: chatId,
+        [kind === "img" ? "photo" : "video"]: url,
+      }).catch(() => {});
+    }
+  }
+}
+
+async function showAccountSection(chatId: number, short: string, sectionId: string) {
+  const id = await resolveId(short);
+  const account = id ? await loadAccount(id) : null;
+  const section = sectionById(sectionId);
+  if (!account || !section) return;
+  const items = filledFields(section, (account.details ?? {}) as AccountDetails);
+  const body = items
+    .map(({ field, value }) => `${field.icon ?? "•"} ${field.label}: <b>${escapeHtml(formatValue(field, value))}</b>`)
+    .join("\n");
+  await send(
+    chatId,
+    [
+      `${section.icon} <b>${section.title.toUpperCase()}</b>`,
+      "━━━━━━━━━━━━━━━━━━",
+      `🏷 ${escapeHtml(account.title)}`,
+      "",
+      body || "— ma'lumot yo'q —",
+    ].join("\n"),
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "⬅️ E'longa qaytish", callback_data: `acc:${short}` }],
+          [{ text: "🏠 Menyu", callback_data: "home" }],
+        ],
+      },
+    },
+  );
+}
+
+async function toggleFavourite(chatId: number, short: string) {
+  const key = `bot_fav:${chatId}`;
+  const raw = (await storeGet(key)) ?? "";
+  const list = raw.split(",").filter(Boolean);
+  const exists = list.includes(short);
+  const next = exists ? list.filter((v) => v !== short) : [...list, short];
+  await storeSet(key, next.join(","));
+  await send(chatId, exists ? "💔 Sevimlilardan olib tashlandi." : "❤️ Sevimlilarga qo'shildi!", {
+    reply_markup: { inline_keyboard: [[{ text: "⬅️ E'lon", callback_data: `acc:${short}` }]] },
+  });
+}
+
+async function addToCompare(chatId: number, short: string) {
+  const key = `bot_cmp:${chatId}`;
+  const raw = (await storeGet(key)) ?? "";
+  const list = [...new Set([...raw.split(",").filter(Boolean), short])].slice(-2);
+  await storeSet(key, list.join(","));
+  if (list.length < 2) {
+    await send(chatId, "⚖️ Qo'shildi. Yana bitta e'lonni tanlang — solishtiramiz.", {
+      reply_markup: { inline_keyboard: [[{ text: "🔍 Bozor", callback_data: "accounts" }]] },
+    });
+    return;
+  }
+  const rows: string[] = ["⚖️ <b>SOLISHTIRISH</b>", "━━━━━━━━━━━━━━━━━━"];
+  for (const s of list) {
+    const id = await resolveId(s);
+    const a = id ? await loadAccount(id) : null;
+    if (!a) continue;
+    const d = (a.details ?? {}) as AccountDetails;
+    rows.push(
+      "",
+      `🏷 <b>${escapeHtml(a.title)}</b>`,
+      `💰 ${money(a.price, a.currency)}`,
+      `⭐ LVL: ${escapeHtml(String(pick(d, "main", "level") ?? a.level ?? "—"))} · 🏆 ${escapeHtml(String(pick(d, "main", "rank") ?? "—"))}`,
+      `🔫 Gun: ${escapeHtml(String(pick(d, "inventory", "guns") ?? "—"))} · 💎 Mythic: ${escapeHtml(String(pick(d, "mythic", "mythic") ?? "—"))} · 👑 X-Suit: ${escapeHtml(String(pick(d, "mythic", "xsuit_count") ?? "—"))}`,
+    );
+  }
+  await storeSet(key, "");
+  await send(chatId, rows.join("\n"), {
+    reply_markup: { inline_keyboard: [[{ text: "🔍 Bozor", callback_data: "accounts" }], [{ text: "🏠 Menyu", callback_data: "home" }]] },
+  });
+}
+
 async function showAccounts(chatId: number) {
   const base = appUrl();
   try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await supabaseAdmin
-      .from("accounts")
-      .select("id, title, price, currency, level, sold")
-      .eq("sold", false)
-      .order("created_at", { ascending: false })
-      .limit(8);
+    const list = await loadAccounts(8);
+    for (const a of list) shortIds.set(a.id.slice(0, 8), a.id);
 
-    const lines = (data ?? []).map(
-      (a) =>
-        `🎯 <b>${escapeHtml(a.title)}</b>\n   LVL ${a.level ?? "—"} · 💵 ${Number(a.price).toLocaleString("ru-RU")} ${a.currency}`,
-    );
+    if (!list.length) {
+      await send(
+        chatId,
+        `🔍 <b>BOZOR</b>\n━━━━━━━━━━━━━━━━━━\n${await getSetting("bot_orders_empty")}`,
+        { reply_markup: await shopInline() },
+      );
+      return;
+    }
+
+    const lines = list.map((a, i) => {
+      const d = (a.details ?? {}) as AccountDetails;
+      return `${i + 1}. 🎯 <b>${escapeHtml(a.title)}</b>\n   ⭐ LVL ${escapeHtml(String(pick(d, "main", "level") ?? a.level ?? "—"))} · 🏆 ${escapeHtml(String(pick(d, "main", "rank") ?? "—"))} · 💰 ${money(a.price, a.currency)}`;
+    });
+
+    const rows: Row[] = [];
+    for (let i = 0; i < list.length; i += 3) {
+      rows.push(
+        list.slice(i, i + 3).map((a, j) => ({
+          text: `${i + j + 1}️⃣`,
+          callback_data: `acc:${a.id.slice(0, 8)}`,
+        })),
+      );
+    }
+    rows.push([{ text: "🎮 Barcha akkauntlar (Mini App)", web_app: { url: base } }]);
+    rows.push([
+      { text: "💸 Arzon", web_app: { url: `${base}/?filtr=arzon` } },
+      { text: "💎 Qimmat", web_app: { url: `${base}/?filtr=qimmat` } },
+    ]);
+    rows.push([{ text: "🏠 Menyu", callback_data: "home" }]);
 
     await send(
       chatId,
-      lines.length
-        ? `🔍 <b>2. AKKAUNTLAR</b>\n━━━━━━━━━━━━━━━━━━\n${lines.join("\n\n")}\n\n🔎 Filtr va qidiruv — Mini App ichida.`
-        : `🔍 <b>2. AKKAUNTLAR</b>\n━━━━━━━━━━━━━━━━━━\n${await getSetting("bot_orders_empty")}`,
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🎮 Barcha akkauntlar", web_app: { url: base } }],
-            [
-              { text: "💸 Arzon", web_app: { url: `${base}/?filtr=arzon` } },
-              { text: "💎 Qimmat", web_app: { url: `${base}/?filtr=qimmat` } },
-            ],
-            [{ text: "🏠 Bosh menyu", callback_data: "home" }],
-          ],
-        },
-      },
+      `🔍 <b>BOZOR — TOP E'LONLAR</b>\n━━━━━━━━━━━━━━━━━━\n${lines.join("\n\n")}\n\n👇 Raqamni bosing — to'liq karta chiqadi.`,
+      { reply_markup: { inline_keyboard: rows } },
     );
   } catch (error) {
     botLog.error("accounts_failed", error, { chatId });
     await send(chatId, await getSetting("bot_orders_empty"), { reply_markup: await shopInline() });
   }
 }
+
 
 async function showGuarantee(chatId: number) {
   const support = tgLink(await getSetting("bot_support"));
@@ -757,6 +1083,18 @@ async function handleMessage(update: Update) {
     await showMain(chatId, userId, name);
     return;
   }
+  if (command === "/bozor" || command === "/market") {
+    await showAccounts(chatId);
+    return;
+  }
+  if (command === "/sotish") {
+    await showSell(chatId);
+    return;
+  }
+  if (command === "/menyu" || command === "/keyboard") {
+    await showKeyboard(chatId, admin);
+    return;
+  }
   if (command === "/id") {
     await send(chatId, `🆔 Sizning Telegram ID: <code>${userId}</code>`);
     return;
@@ -845,6 +1183,35 @@ async function handleCallback(cb: NonNullable<Update["callback_query"]>) {
       await send(chatId, "✅ <b>Rahmat!</b> Obuna tasdiqlandi 🎉");
       await showMain(chatId, userId, name);
     }
+    return;
+  }
+  if (data === "kb") {
+    await showKeyboard(chatId, admin);
+    return;
+  }
+  if (data.startsWith("acc:")) {
+    await showAccountCard(chatId, data.slice(4));
+    return;
+  }
+  if (data.startsWith("sec:")) {
+    const [, short, sectionId] = data.split(":");
+    if (short && sectionId) await showAccountSection(chatId, short, sectionId);
+    return;
+  }
+  if (data.startsWith("img:")) {
+    await showAccountMedia(chatId, data.slice(4), "img");
+    return;
+  }
+  if (data.startsWith("vid:")) {
+    await showAccountMedia(chatId, data.slice(4), "vid");
+    return;
+  }
+  if (data.startsWith("fav:")) {
+    await toggleFavourite(chatId, data.slice(4));
+    return;
+  }
+  if (data.startsWith("cmp:")) {
+    await addToCompare(chatId, data.slice(4));
     return;
   }
   if (data === "home") {

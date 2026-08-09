@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, LogIn, ShieldCheck, UserPlus } from "lucide-react";
+import { Loader2, LogIn, Send, ShieldCheck, UserPlus } from "lucide-react";
+import { tgWebApp } from "@/components/TelegramViewport";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { AppShell } from "@/components/AppShell";
@@ -118,15 +119,52 @@ function AuthPage() {
       return;
     }
     if (!data.session) {
+      // Email tasdiqlash yoqilgan bo'lsa ham darhol kirishga urinamiz.
+      const retry = await supabase.auth.signInWithPassword({ email, password });
       setBusy(false);
-      toast.info("Hisob yaratildi. Tasdiqlash talab qilinsa, emailni tekshiring; keyin «Kirish»ni bosing.");
       remember();
+      if (retry.error) {
+        toast.info("Hisob yaratildi. Endi «Kirish» bo'limidan login qiling.");
+        return;
+      }
+      toast.success("Hisob yaratildi ✅");
       return;
-    } else {
-      setBusy(false);
     }
+    setBusy(false);
     remember();
     toast.success("Hisob yaratildi ✅");
+  }
+
+  const inTelegram = typeof window !== "undefined" && Boolean(tgWebApp()?.initData);
+
+  async function telegramLogin() {
+    const initData = tgWebApp()?.initData;
+    if (!initData) {
+      toast.error("Telegram ilovasi orqali oching");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/public/tg-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ initData }),
+      });
+      const payload = (await res.json()) as { email?: string; password?: string; error?: string };
+      if (!res.ok || !payload.email || !payload.password) {
+        throw new Error(payload.error ?? "login_failed");
+      }
+      const { error } = await supabase.auth.signInWithPassword({
+        email: payload.email,
+        password: payload.password,
+      });
+      if (error) throw error;
+      toast.success("Telegram orqali kirdingiz 🎮");
+    } catch {
+      toast.error("Telegram orqali kirish bo'lmadi. Login/parol bilan urinib ko'ring.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -140,6 +178,27 @@ function AuthPage() {
         </p>
 
         <div className="panel p-5">
+          {inTelegram ? (
+            <div className="mb-4">
+              <Button
+                type="button"
+                onClick={telegramLogin}
+                disabled={busy}
+                className="w-full font-bold"
+              >
+                {busy ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                ) : (
+                  <Send className="mr-2 size-4" />
+                )}
+                Telegram orqali bir bosishda kirish
+              </Button>
+              <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                parol kerak emas — Telegram hisobingiz bilan
+              </p>
+            </div>
+          ) : null}
+
           <Tabs defaultValue="in">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="in">

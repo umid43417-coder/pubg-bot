@@ -199,3 +199,47 @@
     animation: none !important;
   }
 }
+
+/* ===== Telegram Mini App / mobil barqarorlik ===== */
+:root {
+  --tg-vh: 100vh;
+}
+
+@utility app-shell {
+  min-height: var(--tg-vh, 100vh);
+}
+
+html.in-telegram,
+html.in-telegram body {
+  overscroll-behavior-y: none;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+/* Backdrop "kaltirash"ini yo'qotamiz: fon fixed va viewport bilan bog'lanadi */
+.fx-backdrop {
+  position: fixed;
+  inset: 0;
+  height: var(--tg-vh, 100vh);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Mobil formalarda zoom bo'lmasligi uchun */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+details > summary::-webkit-details-marker {
+  display: none;
+}
