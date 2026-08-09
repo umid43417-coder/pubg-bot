@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as MeningRouteImport } from './routes/mening'
 import { Route as SotishRouteImport } from './routes/sotish'
 import { Route as AkkauntIdRouteImport } from './routes/akkaunt.$id'
+import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +47,12 @@ const AkkauntIdRoute = AkkauntIdRouteImport.update({
   path: '/akkaunt/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicTelegramWebhookRoute =
+  ApiPublicTelegramWebhookRouteImport.update({
+    id: '/api/public/telegram/webhook',
+    path: '/api/public/telegram/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByFullPath {
   '/mening': typeof MeningRoute
   '/sotish': typeof SotishRoute
   '/akkaunt/$id': typeof AkkauntIdRoute
+  '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +70,7 @@ export interface FileRoutesByTo {
   '/mening': typeof MeningRoute
   '/sotish': typeof SotishRoute
   '/akkaunt/$id': typeof AkkauntIdRoute
+  '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,12 +80,27 @@ export interface FileRoutesById {
   '/mening': typeof MeningRoute
   '/sotish': typeof SotishRoute
   '/akkaunt/$id': typeof AkkauntIdRoute
+  '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/auth' | '/mening' | '/sotish' | '/akkaunt/$id'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/mening'
+    | '/sotish'
+    | '/akkaunt/$id'
+    | '/api/public/telegram/webhook'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/auth' | '/mening' | '/sotish' | '/akkaunt/$id'
+  to:
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/mening'
+    | '/sotish'
+    | '/akkaunt/$id'
+    | '/api/public/telegram/webhook'
   id:
     | '__root__'
     | '/'
@@ -85,6 +109,7 @@ export interface FileRouteTypes {
     | '/mening'
     | '/sotish'
     | '/akkaunt/$id'
+    | '/api/public/telegram/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -94,6 +119,7 @@ export interface RootRouteChildren {
   MeningRoute: typeof MeningRoute
   SotishRoute: typeof SotishRoute
   AkkauntIdRoute: typeof AkkauntIdRoute
+  ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -140,6 +166,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AkkauntIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/telegram/webhook': {
+      id: '/api/public/telegram/webhook'
+      path: '/api/public/telegram/webhook'
+      fullPath: '/api/public/telegram/webhook'
+      preLoaderRoute: typeof ApiPublicTelegramWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -150,17 +183,8 @@ const rootRouteChildren: RootRouteChildren = {
   MeningRoute: MeningRoute,
   SotishRoute: SotishRoute,
   AkkauntIdRoute: AkkauntIdRoute,
+  ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
