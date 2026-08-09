@@ -1,11 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Mail, Phone } from "lucide-react";
+import { Loader2, LogIn, ShieldCheck, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 import { useSession } from "@/hooks/useSession";
-import { useI18n } from "@/lib/i18n";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,10 +16,10 @@ export const Route = createFileRoute("/auth")({
       { title: "Kirish — PUBG Market" },
       {
         name: "description",
-        content: "PUBG Market akkaunt magaziniga Gmail, email yoki telefon raqam orqali kiring.",
+        content: "PUBG Market akkaunt magaziniga login va parol orqali kiring yoki ro'yxatdan o'ting.",
       },
       { property: "og:title", content: "Kirish — PUBG Market" },
-      { property: "og:description", content: "E'lon joylash uchun tizimga kiring." },
+      { property: "og:description", content: "Login va parol bilan tez ro'yxatdan o'tish." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -29,103 +27,105 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+const LOGIN_KEY = "pubgmarket:last_login";
+
+/** Login (yoki telefon) -> Supabase uchun ichki email. */
+function loginToEmail(raw: string) {
+  const value = raw.trim().toLowerCase();
+  if (value.includes("@")) return value;
+  const digits = value.replace(/\D/g, "");
+  if (digits.length >= 9 && /^[+\d\s()-]+$/.test(value)) return `p${digits}@pubgmarket.app`;
+  const safe = value.replace(/[^a-z0-9_.-]/g, "");
+  return `${safe}@pubgmarket.app`;
+}
+
 function AuthPage() {
   const { user, loading } = useSession();
-  const { t } = useI18n();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
-  const [phone, setPhone] = useState("+998");
-  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem(LOGIN_KEY) : null;
+    if (saved) setLogin(saved);
+  }, []);
 
   useEffect(() => {
     if (!loading && user) navigate({ to: "/", replace: true });
   }, [user, loading, navigate]);
 
+  function validate() {
+    const value = login.trim();
+    if (value.replace(/[^a-z0-9@._-]/gi, "").length < 3) {
+      toast.error("Login kamida 3 ta belgidan iborat bo'lsin");
+      return false;
+    }
+    if (password.length < 6) {
+      toast.error("Parol kamida 6 ta belgidan iborat bo'lsin");
+      return false;
+    }
+    return true;
+  }
+
+  function remember() {
+    try {
+      localStorage.setItem(LOGIN_KEY, login.trim());
+    } catch {
+      /* ignore */
+    }
+  }
+
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
+    if (!validate()) return;
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: loginToEmail(login),
+      password,
+    });
     setBusy(false);
-    if (error) toast.error(error.message);
-    else toast.success(t("welcome"));
+    if (error) {
+      toast.error("Login yoki parol xato. Ro'yxatdan o'tgan bo'lsangiz tekshirib qayting.");
+      return;
+    }
+    remember();
+    toast.success("Xush kelibsiz! 🎮");
   }
 
   async function signUp(e: React.FormEvent) {
     e.preventDefault();
+    if (!validate()) return;
     setBusy(true);
+    const email = loginToEmail(login);
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: window.location.origin },
+      options: { data: { login: login.trim() } },
     });
-    setBusy(false);
-    if (error) toast.error(error.message);
-    else if (!data.session) toast.success(t("check_email"));
-    else toast.success(t("account_created"));
-  }
-
-  // Gmail: avval Supabase'ning o'z OAuth oqimi, u ishlamasa Lovable oqimi.
-  async function google() {
-    setBusy(true);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/`,
-          queryParams: { prompt: "select_account" },
-        },
-      });
-      if (!error) return;
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/`,
-      });
-      if (result.error) toast.error(t("google_error"));
-    } catch {
-      toast.error(t("google_error"));
-    } finally {
+    if (error) {
+      // Allaqachon mavjud bo'lsa — shunchaki kiritamiz.
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      setBusy(false);
+      if (signInError) toast.error(error.message);
+      else {
+        remember();
+        toast.success("Xush kelibsiz! 🎮");
+      }
+      return;
+    }
+    if (!data.session) {
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      setBusy(false);
+      if (signInError) {
+        toast.info("Hisob yaratildi. Endi «Kirish» bo'limidan login va parol bilan kiring.");
+        return;
+      }
+    } else {
       setBusy(false);
     }
-  }
-
-  function phoneEmail(raw: string) {
-    const digits = raw.replace(/\D/g, "");
-    return `p${digits}@pubgmarket.app`;
-  }
-
-  // Telefon raqam + parol (SMS provayder talab qilinmaydi).
-  async function phoneAuth(e: React.FormEvent) {
-    e.preventDefault();
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length < 9) {
-      toast.error("Telefon raqamni to'liq kiriting");
-      return;
-    }
-    if (code.length < 6) {
-      toast.error("Parol kamida 6 ta belgidan iborat bo'lsin");
-      return;
-    }
-    setBusy(true);
-    const synthetic = phoneEmail(phone);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: synthetic,
-      password: code,
-    });
-    if (!error) {
-      setBusy(false);
-      toast.success(t("welcome"));
-      return;
-    }
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: synthetic,
-      password: code,
-      options: { data: { phone: `+${digits}` } },
-    });
-    setBusy(false);
-    if (signUpError) toast.error(signUpError.message);
-    else if (!data.session) toast.error("Hisob yaratildi, lekin tasdiqlash kerak. Admin bilan bog'laning.");
-    else toast.success(t("account_created"));
+    remember();
+    toast.success("Hisob yaratildi ✅");
   }
 
   return (
@@ -134,28 +134,18 @@ function AuthPage() {
         <h1 className="mb-1 text-center text-2xl font-bold">
           PUBG<span className="text-grad">MARKET</span>
         </h1>
-        <p className="mb-6 text-center text-sm text-muted-foreground">{t("auth_subtitle")}</p>
+        <p className="mb-6 text-center text-sm text-muted-foreground">
+          🔐 Login va parol orqali kiring — hisobingiz eslab qolinadi.
+        </p>
 
         <div className="panel p-5">
-          <Button
-            className="w-full font-bold"
-            disabled={busy}
-            onClick={google}
-            aria-label={t("continue_google")}
-          >
-            <Mail className="mr-2 size-4" /> {t("continue_google")}
-          </Button>
-
-          <div className="my-4 text-center text-xs uppercase tracking-widest text-muted-foreground">
-            {t("or")}
-          </div>
-
           <Tabs defaultValue="in">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="in">{t("sign_in")}</TabsTrigger>
-              <TabsTrigger value="up">{t("sign_up")}</TabsTrigger>
-              <TabsTrigger value="phone">
-                <Phone className="mr-1 size-3" /> Nomer
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="in">
+                <LogIn className="mr-1 size-3" /> Kirish
+              </TabsTrigger>
+              <TabsTrigger value="up">
+                <UserPlus className="mr-1 size-3" /> Ro'yxatdan o'tish
               </TabsTrigger>
             </TabsList>
 
@@ -163,21 +153,22 @@ function AuthPage() {
               <TabsContent key={tab} value={tab} className="mt-4">
                 <form onSubmit={tab === "in" ? signIn : signUp} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor={`email-${tab}`}>{t("email")}</Label>
+                    <Label htmlFor={`login-${tab}`}>Login yoki telefon</Label>
                     <Input
-                      id={`email-${tab}`}
-                      type="email"
+                      id={`login-${tab}`}
+                      autoComplete="username"
                       required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="siz@gmail.com"
+                      value={login}
+                      onChange={(e) => setLogin(e.target.value)}
+                      placeholder="pubgking yoki +998901234567"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor={`pass-${tab}`}>{t("password")}</Label>
+                    <Label htmlFor={`pass-${tab}`}>Parol</Label>
                     <Input
                       id={`pass-${tab}`}
                       type="password"
+                      autoComplete={tab === "in" ? "current-password" : "new-password"}
                       required
                       minLength={6}
                       value={password}
@@ -187,47 +178,16 @@ function AuthPage() {
                   </div>
                   <Button type="submit" disabled={busy} className="w-full font-bold">
                     {busy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                    {tab === "in" ? t("sign_in") : t("create_account")}
+                    {tab === "in" ? "Kirish" : "Ro'yxatdan o'tish"}
                   </Button>
                 </form>
               </TabsContent>
             ))}
-
-            <TabsContent value="phone" className="mt-4">
-              <form onSubmit={phoneAuth} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Telefon raqam</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+998901234567"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone-pass">Parol</Label>
-                  <Input
-                    id="phone-pass"
-                    type="password"
-                    required
-                    minLength={6}
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    placeholder="••••••"
-                  />
-                </div>
-                <Button type="submit" disabled={busy} className="w-full font-bold">
-                  {busy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                  Kirish / Ro'yxatdan o'tish
-                </Button>
-                <p className="text-center text-xs text-muted-foreground">
-                  Birinchi marta kirsangiz hisob avtomatik yaratiladi.
-                </p>
-              </form>
-            </TabsContent>
           </Tabs>
+
+          <p className="mt-4 flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
+            <ShieldCheck className="size-3 text-accent" /> Ma'lumotlaringiz xavfsiz saqlanadi
+          </p>
         </div>
       </div>
     </AppShell>

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as MeningRouteImport } from './routes/mening'
+import { Route as QoidalarRouteImport } from './routes/qoidalar'
 import { Route as SotishRouteImport } from './routes/sotish'
 import { Route as AkkauntIdRouteImport } from './routes/akkaunt.$id'
 import { Route as ApiPublicTelegramSetupRouteImport } from './routes/api/public/telegram/setup'
@@ -36,6 +37,11 @@ const AuthRoute = AuthRouteImport.update({
 const MeningRoute = MeningRouteImport.update({
   id: '/mening',
   path: '/mening',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QoidalarRoute = QoidalarRouteImport.update({
+  id: '/qoidalar',
+  path: '/qoidalar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SotishRoute = SotishRouteImport.update({
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/mening': typeof MeningRoute
+  '/qoidalar': typeof QoidalarRoute
   '/sotish': typeof SotishRoute
   '/akkaunt/$id': typeof AkkauntIdRoute
   '/api/public/telegram/setup': typeof ApiPublicTelegramSetupRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/mening': typeof MeningRoute
+  '/qoidalar': typeof QoidalarRoute
   '/sotish': typeof SotishRoute
   '/akkaunt/$id': typeof AkkauntIdRoute
   '/api/public/telegram/setup': typeof ApiPublicTelegramSetupRoute
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/mening': typeof MeningRoute
+  '/qoidalar': typeof QoidalarRoute
   '/sotish': typeof SotishRoute
   '/akkaunt/$id': typeof AkkauntIdRoute
   '/api/public/telegram/setup': typeof ApiPublicTelegramSetupRoute
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/mening'
+    | '/qoidalar'
     | '/sotish'
     | '/akkaunt/$id'
     | '/api/public/telegram/setup'
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/mening'
+    | '/qoidalar'
     | '/sotish'
     | '/akkaunt/$id'
     | '/api/public/telegram/setup'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/mening'
+    | '/qoidalar'
     | '/sotish'
     | '/akkaunt/$id'
     | '/api/public/telegram/setup'
@@ -129,6 +141,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
   MeningRoute: typeof MeningRoute
+  QoidalarRoute: typeof QoidalarRoute
   SotishRoute: typeof SotishRoute
   AkkauntIdRoute: typeof AkkauntIdRoute
   ApiPublicTelegramSetupRoute: typeof ApiPublicTelegramSetupRoute
@@ -163,6 +176,13 @@ declare module '@tanstack/react-router' {
       path: '/mening'
       fullPath: '/mening'
       preLoaderRoute: typeof MeningRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/qoidalar': {
+      id: '/qoidalar'
+      path: '/qoidalar'
+      fullPath: '/qoidalar'
+      preLoaderRoute: typeof QoidalarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sotish': {
@@ -201,6 +221,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
   MeningRoute: MeningRoute,
+  QoidalarRoute: QoidalarRoute,
   SotishRoute: SotishRoute,
   AkkauntIdRoute: AkkauntIdRoute,
   ApiPublicTelegramSetupRoute: ApiPublicTelegramSetupRoute,

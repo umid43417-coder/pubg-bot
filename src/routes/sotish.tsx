@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ImagePlus, Loader2, Video } from "lucide-react";
+import { ImagePlus, Loader2, Video, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { useI18n } from "@/lib/i18n";
@@ -52,6 +52,8 @@ function SellPage() {
   const [images, setImages] = useState<File[]>([]);
   const [videos, setVideos] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(0);
+  const total = images.length + videos.length;
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth", replace: true });
@@ -60,13 +62,41 @@ function SellPage() {
   async function upload(files: File[], userId: string) {
     const paths: string[] = [];
     for (const file of files) {
-      const ext = file.name.split(".").pop() ?? "bin";
+      const ext = (file.name.split(".").pop() ?? "bin").toLowerCase();
       const path = `${userId}/${crypto.randomUUID()}.${ext}`;
-      const { error } = await supabase.storage.from("account-media").upload(path, file);
+      const { error } = await supabase.storage
+        .from("account-media")
+        .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
       if (error) throw error;
       paths.push(path);
+      setDone((d) => d + 1);
     }
     return paths;
+  }
+
+  function addFiles(kind: "image" | "video", incoming: FileList | null) {
+    const limitMb = kind === "image" ? 15 : 200;
+    const picked = Array.from(incoming ?? []).filter((f) => {
+      if (f.size > limitMb * 1024 * 1024) {
+        toast.error(`${f.name} — ${limitMb}MB dan katta`);
+        return false;
+      }
+      return true;
+    });
+    if (picked.length === 0) return;
+    const setter = kind === "image" ? setImages : setVideos;
+    setter((prev) => {
+      const merged = [...prev];
+      for (const file of picked) {
+        if (!merged.some((f) => f.name === file.name && f.size === file.size)) merged.push(file);
+      }
+      return merged;
+    });
+  }
+
+  function removeFile(kind: "image" | "video", index: number) {
+    const setter = kind === "image" ? setImages : setVideos;
+    setter((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -74,6 +104,7 @@ function SellPage() {
     if (!user) return;
     const fd = new FormData(e.currentTarget);
     setBusy(true);
+    setDone(0);
     try {
       const [imagePaths, videoPaths] = await Promise.all([
         upload(images, user.id),
@@ -165,7 +196,12 @@ function SellPage() {
         </section>
 
         <section className="panel space-y-4 p-5">
-          <h2 className="text-base font-bold">{t("media_section")}</h2>
+          <h2 className="text-base font-bold">📸 {t("media_section")}</h2>
+          <p className="text-xs text-muted-foreground">
+            Bir nechta rasm va videoni birdan tanlashingiz mumkin. Yana qo'shsangiz — eskilari
+            o'chib ketmaydi. Rasm ≤ 15MB, video ≤ 200MB.
+          </p>
+
           <div className="space-y-2">
             <Label htmlFor="images" className="flex items-center gap-2">
               <ImagePlus className="size-4" /> {t("photos")}
@@ -175,12 +211,40 @@ function SellPage() {
               type="file"
               accept="image/*"
               multiple
-              onChange={(e) => setImages(Array.from(e.target.files ?? []))}
+              onChange={(e) => {
+                addFiles("image", e.target.files);
+                e.target.value = "";
+              }}
             />
+            {images.length > 0 ? (
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {images.map((file, i) => (
+                  <div
+                    key={`${file.name}-${i}`}
+                    className="group relative overflow-hidden rounded-lg border border-border"
+                  >
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt={`Yuklanadigan rasm ${i + 1}`}
+                      className="aspect-square w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      aria-label="Rasmni o'chirish"
+                      onClick={() => removeFile("image", i)}
+                      className="absolute right-1 top-1 grid size-6 place-items-center rounded-md bg-background/80 text-destructive"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <p className="text-xs text-muted-foreground">
               {images.length} {t("photos_selected")}
             </p>
           </div>
+
           <div className="space-y-2">
             <Label htmlFor="videos" className="flex items-center gap-2">
               <Video className="size-4" /> {t("videos")}
@@ -190,12 +254,43 @@ function SellPage() {
               type="file"
               accept="video/*"
               multiple
-              onChange={(e) => setVideos(Array.from(e.target.files ?? []))}
+              onChange={(e) => {
+                addFiles("video", e.target.files);
+                e.target.value = "";
+              }}
             />
+            {videos.length > 0 ? (
+              <ul className="space-y-2">
+                {videos.map((file, i) => (
+                  <li
+                    key={`${file.name}-${i}`}
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border p-2 text-xs"
+                  >
+                    <span className="min-w-0 truncate">
+                      🎬 {file.name} · {(file.size / 1024 / 1024).toFixed(1)}MB
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="Videoni o'chirish"
+                      onClick={() => removeFile("video", i)}
+                      className="shrink-0 text-destructive"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             <p className="text-xs text-muted-foreground">
               {videos.length} {t("videos_selected")}
             </p>
           </div>
+
+          {busy && total > 0 ? (
+            <p className="text-xs font-semibold text-primary">
+              ⏫ Yuklanmoqda: {done}/{total}
+            </p>
+          ) : null}
         </section>
 
         <div className="flex gap-3">

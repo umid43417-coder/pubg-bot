@@ -1,5 +1,5 @@
 import { Link, useRouter } from "@tanstack/react-router";
-import { Crosshair, LogOut, Plus, Shield, Store, User } from "lucide-react";
+import { Crosshair, LogOut, Plus, Scroll, Shield, Store, User } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
@@ -27,6 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { to: "/", label: t("nav_shop"), icon: Store },
     { to: "/sotish", label: t("nav_sell"), icon: Plus },
     { to: "/mening", label: t("nav_mine"), icon: User },
+    { to: "/qoidalar", label: "Qoidalar", icon: Scroll },
     ...(isAdmin ? [{ to: "/admin", label: t("nav_admin"), icon: Shield }] : []),
   ];
 

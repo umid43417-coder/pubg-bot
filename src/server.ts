@@ -44,9 +44,29 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+let webhookKicked = false;
+
+// Ilova ishga tushganda Telegram webhookni avtomatik ro'yxatdan o'tkazamiz,
+// shunda /start har doim ishlaydi (qo'lda sozlash shart emas).
+function kickWebhookSetup(request: Request) {
+  if (webhookKicked) return;
+  webhookKicked = true;
+  const origin = (() => {
+    try {
+      return new URL(request.url).origin;
+    } catch {
+      return undefined;
+    }
+  })();
+  void import("./lib/bot/bot.server")
+    .then((m) => m.ensureWebhook(origin))
+    .catch((error) => console.error(error));
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      void kickWebhookSetup(request);
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
