@@ -15,6 +15,7 @@ import { fetchAdminTelegram, saveAdminTelegram } from "@/lib/settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { verifyAdminPin } from "@/lib/admin-pin.functions";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -86,10 +87,55 @@ function AdminPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const [pinOk, setPinOk] = useState(false);
+  const [pin, setPin] = useState("");
+  useEffect(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("pubgmarket:admin_pin") === "1") {
+      setPinOk(true);
+    }
+  }, []);
+
+  async function submitPin(e: React.FormEvent) {
+    e.preventDefault();
+    const res = await verifyAdminPin({ data: { pin } });
+    if (!res.ok) {
+      toast.error("Parol noto'g'ri");
+      return;
+    }
+    sessionStorage.setItem("pubgmarket:admin_pin", "1");
+    setPinOk(true);
+  }
+
   if (!roleLoading && user && !isAdmin) {
     return (
       <AppShell>
         <div className="panel p-10 text-center text-muted-foreground">{t("admin_only")}</div>
+      </AppShell>
+    );
+  }
+
+  if (user && isAdmin && !pinOk) {
+    return (
+      <AppShell>
+        <form onSubmit={submitPin} className="panel mx-auto max-w-sm space-y-4 p-6">
+          <h1 className="flex items-center gap-2 text-lg font-bold">
+            <Shield className="size-5 text-primary" /> Admin parol
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Panelga kirish uchun admin parolini kiriting.
+          </p>
+          <Input
+            type="password"
+            autoComplete="current-password"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            placeholder="••••••"
+            required
+          />
+          <Button type="submit" className="w-full font-bold">
+            Kirish
+          </Button>
+        </form>
       </AppShell>
     );
   }

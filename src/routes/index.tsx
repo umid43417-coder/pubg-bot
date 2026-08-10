@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import heroImg from "@/assets/hero.jpg";
 import { BulletTracers, FloatingGun, SpinningCrosshair } from "@/components/GameFX";
+import { BattleScene } from "@/components/BattleScene";
 
 type SortKey = "new" | "cheap" | "expensive" | "level";
 
@@ -79,8 +80,9 @@ function Home() {
           className="absolute inset-0 size-full object-cover opacity-45"
         />
         <BulletTracers />
-        <FloatingGun className="absolute -right-6 bottom-2 z-10 sm:right-4" />
-        <div className="relative space-y-4 p-6 sm:p-10">
+        <BattleScene />
+        <FloatingGun className="absolute -right-6 top-4 z-10 hidden sm:block" />
+        <div className="relative space-y-4 p-6 pb-40 sm:p-10 sm:pb-52">
           <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-primary">
             <Flame className="fx-blink size-4" /> {t("hero_kicker")}
           </p>
@@ -90,16 +92,16 @@ function Home() {
             <span className="text-grad">{t("hero_buy")}</span>
           </h1>
           <p className="max-w-md text-sm text-muted-foreground">{t("hero_text")}</p>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Button asChild size="lg" className="font-bold">
               <Link to="/sotish">
                 <Sparkles className="mr-2 size-4" /> {t("post_listing")}
               </Link>
             </Button>
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-card/70 px-4 text-sm font-semibold">
-              <SpinningCrosshair className="size-8 text-xs" />
-              <ShieldCheck className="size-4 text-accent" /> {t("admin_guarantee")}
-
+            <div className="inline-flex h-11 items-center gap-2 rounded-lg border border-accent/40 bg-card/80 px-4 text-sm font-semibold backdrop-blur">
+              <ShieldCheck className="size-4 shrink-0 text-accent" />
+              <span className="whitespace-nowrap">{t("admin_guarantee")}</span>
+              <SpinningCrosshair className="size-6 text-[10px]" />
             </div>
           </div>
         </div>
