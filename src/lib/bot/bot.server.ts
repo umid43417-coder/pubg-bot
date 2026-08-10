@@ -274,10 +274,8 @@ function replyKeyboard(admin: boolean) {
   return {
     keyboard: [
       [{ text: BTN.accounts }, { text: BTN.sell }, { text: BTN.profile }],
-      [{ text: BTN.guarantee }, { text: BTN.orders }, { text: BTN.contact }],
-      [{ text: BTN.payments }, { text: BTN.bonus }, { text: BTN.top }],
-      [{ text: BTN.news }, { text: BTN.rules }, { text: BTN.complaint }],
-      ...(admin ? [[{ text: BTN.admin }, { text: BTN.home }]] : [[{ text: BTN.home }]]),
+      [{ text: BTN.guarantee }, { text: BTN.contact }, { text: BTN.home }],
+      ...(admin ? [[{ text: BTN.admin }]] : []),
     ],
     resize_keyboard: true,
     is_persistent: true,
@@ -290,7 +288,6 @@ type Row = { text: string; web_app?: { url: string }; url?: string; callback_dat
 /** Asosiy menyu — telefonda ham ixcham (qisqa nomlar, 3 tagacha ustun). */
 async function mainInline(admin: boolean): Promise<{ inline_keyboard: Row[] }> {
   const base = appUrl();
-  const support = tgLink(await getSetting("bot_support"));
 
   const rows: Row[] = [
     [{ text: "🎮 MAGAZIN — MINI APP", web_app: { url: base } }],
@@ -301,25 +298,36 @@ async function mainInline(admin: boolean): Promise<{ inline_keyboard: Row[] }> {
     ],
     [
       { text: "🛡 Kafolat", callback_data: "guarantee" },
-      { text: "📋 Buyurtma", callback_data: "orders" },
       { text: "🎧 Admin", callback_data: "contact" },
+      { text: "➕ Ko'proq", callback_data: "more" },
     ],
-    [
-      { text: "💳 To'lov", callback_data: "payments" },
-      { text: "🎁 Bonus", callback_data: "bonus" },
-      { text: "🏆 Top", callback_data: "top" },
-    ],
-    [
-      { text: "📢 Yangilik", callback_data: "news" },
-      { text: "📜 Qoida", callback_data: "rules" },
-      { text: "🚨 Shikoyat", callback_data: "complaint" },
-    ],
-    [{ text: "⌨️ Tez menyu (tugmalar)", callback_data: "kb" }],
   ];
 
-  if (support) rows.push([{ text: "👑 ADMIN BILAN BOG'LANISH", url: support }]);
   if (admin) rows.push([{ text: "🛠 Admin panel", callback_data: "admin" }]);
   return { inline_keyboard: rows };
+}
+
+/** «Ko'proq» — qolgan bo'limlar alohida ixcham panelda. */
+function moreInline(): { inline_keyboard: Row[] } {
+  return {
+    inline_keyboard: [
+      [
+        { text: "💳 To'lov", callback_data: "payments" },
+        { text: "🎁 Bonus", callback_data: "bonus" },
+        { text: "🏆 Top", callback_data: "top" },
+      ],
+      [
+        { text: "📋 Buyurtma", callback_data: "orders" },
+        { text: "📢 Yangilik", callback_data: "news" },
+        { text: "📜 Qoida", callback_data: "rules" },
+      ],
+      [
+        { text: "🚨 Shikoyat", callback_data: "complaint" },
+        { text: "⌨️ Tez menyu", callback_data: "kb" },
+        { text: "🏠 Menyu", callback_data: "home" },
+      ],
+    ],
+  };
 }
 
 
@@ -338,11 +346,10 @@ function adminKeyboard() {
 }
 
 async function shopInline(label = "🎮 Magazinni ochish") {
-  const support = tgLink(await getSetting("bot_support"));
   return {
     inline_keyboard: [
       [{ text: label, web_app: { url: appUrl() } }],
-      ...(support ? [[{ text: "👑 Admin", url: support }]] : []),
+      [{ text: "🛡 Adminga so'rov (garant)", callback_data: "req:help" }],
       [{ text: "🏠 Bosh menyu", callback_data: "home" }],
     ],
   };
@@ -460,12 +467,11 @@ async function showKeyboard(chatId: number, admin: boolean) {
 
 async function showRules(chatId: number) {
   const rules = await getSetting("bot_rules");
-  const support = tgLink(await getSetting("bot_support"));
   await send(chatId, rules, {
     reply_markup: {
       inline_keyboard: [
         [{ text: "🎮 Magazinni ochish", web_app: { url: appUrl() } }],
-        ...(support ? [[{ text: "👑 Admin bilan bog'lanish", url: support }]] : []),
+        [{ text: "🛡 Adminga so'rov (garant)", callback_data: "req:help" }],
         [{ text: "🏠 Bosh menyu", callback_data: "home" }],
       ],
     },
@@ -587,7 +593,6 @@ function accountCaption(a: AccountRow) {
 
 async function accountKeyboard(a: AccountRow) {
   const base = appUrl();
-  const support = tgLink(await getSetting("bot_support"));
   const sections = filledSections((a.details ?? {}) as AccountDetails);
   const rows: Row[] = [];
 
@@ -610,12 +615,10 @@ async function accountKeyboard(a: AccountRow) {
     { text: "⚖️ Solishtirish", callback_data: `cmp:${a.id.slice(0, 8)}` },
   ]);
   rows.push([{ text: "🔎 To'liq ko'rish (Mini App)", web_app: { url: `${base}/akkaunt/${a.id}` } }]);
-  if (support) {
-    rows.push([
-      { text: "🛡️ Garant orqali olish", url: support },
-      { text: "💬 Sotuvchiga yozish", url: support },
-    ]);
-  }
+  rows.push([
+    { text: "🛡️ Garant orqali olish", callback_data: `req:buy:${a.id.slice(0, 8)}` },
+    { text: "💬 Sotuvchi bilan aloqa", callback_data: `req:ask:${a.id.slice(0, 8)}` },
+  ]);
   rows.push([
     { text: "🚨 Shikoyat", callback_data: "complaint" },
     { text: "🔍 Bozor", callback_data: "accounts" },
@@ -818,11 +821,10 @@ async function showAccounts(chatId: number) {
 
 
 async function showGuarantee(chatId: number) {
-  const support = tgLink(await getSetting("bot_support"));
   await send(chatId, await getSetting("bot_guarantee"), {
     reply_markup: {
       inline_keyboard: [
-        ...(support ? [[{ text: "🎧 Admin bilan bog'lanish", url: support }]] : []),
+        [{ text: "🛡 Garant so'rovi yuborish", callback_data: "req:guarantee" }],
         [{ text: "🏠 Bosh menyu", callback_data: "home" }],
       ],
     },
@@ -857,21 +859,109 @@ async function showProfile(chatId: number, userId: number, name: string, usernam
 }
 
 async function showContact(chatId: number) {
-  const support = await getSetting("bot_support");
-  const link = tgLink(support);
   await send(
     chatId,
     [
-      "🎧 <b>6. ADMIN BILAN ALOQA</b>",
+      "🎧 <b>ADMIN BILAN ALOQA</b>",
       "━━━━━━━━━━━━━━━━━━",
-      `👑 Admin: ${escapeHtml(support)}`,
-      "⏱ Ish vaqti: 24/7",
-      "🛡 Barcha savdolar garant asosida.",
+      "🛡 Admin har doim <b>o'rtada (garant)</b> turadi.",
+      "📨 Siz so'rov qoldirasiz — admin <b>o'zi</b> siz bilan bog'lanadi.",
+      "⏱ Ish vaqti: 24/7 · O'rtacha javob: 5–15 daqiqa",
+      "",
+      "⚠️ Adminni chetlab o'tib to'lov qilmang!",
     ].join("\n"),
     {
       reply_markup: {
         inline_keyboard: [
-          ...(link ? [[{ text: "✍️ Adminga yozish", url: link }]] : []),
+          [{ text: "📨 So'rov yuborish", callback_data: "req:help" }],
+          [{ text: "🏠 Bosh menyu", callback_data: "home" }],
+        ],
+      },
+    },
+  );
+}
+
+/* ------------------------------------------------- adminga so'rov (garant) */
+
+const REQ_LABEL: Record<string, string> = {
+  help: "🎧 Umumiy yordam",
+  guarantee: "🛡 Garant xizmati",
+  buy: "💰 Sotib olish (garant)",
+  ask: "💬 Akkaunt haqida savol",
+};
+
+/**
+ * Foydalanuvchi to'g'ridan-to'g'ri admin havolasiga o'tmaydi:
+ * so'rov adminlarga yuboriladi, admin o'zi bog'lanadi (garant).
+ */
+async function sendAdminRequest(
+  chatId: number,
+  userId: number,
+  name: string,
+  kind: string,
+  short?: string,
+  username?: string,
+) {
+  const fromEnv = process.env["BOT_ADMIN_IDS"] ?? "";
+  const fromDb = await getSetting("bot_admin_ids");
+  const admins = adminIdList(fromEnv, fromDb);
+
+  let accountLine = "";
+  if (short) {
+    const id = await resolveId(short);
+    const account = id ? await loadAccount(id) : null;
+    if (account) {
+      accountLine = `\n🏷 E'lon: <b>${escapeHtml(account.title)}</b> — ${money(account.price, account.currency)}\n🔗 ${appUrl()}/akkaunt/${account.id}`;
+    }
+  }
+
+  const body = [
+    "📨 <b>YANGI SO'ROV</b>",
+    "━━━━━━━━━━━━━━━━━━",
+    `📌 Tur: <b>${REQ_LABEL[kind] ?? kind}</b>`,
+    `👤 ${escapeHtml(name)}${username ? ` (@${escapeHtml(username)})` : ""}`,
+    `🆔 <code>${userId}</code>${accountLine}`,
+    "",
+    "👇 Foydalanuvchi bilan o'zingiz bog'laning.",
+  ].join("\n");
+
+  const markup = {
+    inline_keyboard: [
+      [{ text: "✍️ Foydalanuvchiga yozish", url: `tg://user?id=${userId}` }],
+      ...(username ? [[{ text: `@${username}`, url: `https://t.me/${username}` }]] : []),
+    ],
+  };
+
+  let delivered = 0;
+  for (const admin of admins) {
+    const res = await tg("sendMessage", {
+      chat_id: admin,
+      text: body,
+      parse_mode: "HTML",
+      reply_markup: markup,
+    }).catch(() => ({ ok: false }));
+    if ((res as { ok?: boolean }).ok !== false) delivered += 1;
+  }
+
+  botLog.info("admin_request", { userId, kind, short, delivered, admins: admins.length });
+
+  await send(
+    chatId,
+    [
+      "✅ <b>SO'ROVINGIZ QABUL QILINDI</b>",
+      "━━━━━━━━━━━━━━━━━━",
+      `📌 ${REQ_LABEL[kind] ?? kind}`,
+      "",
+      "🛡 Admin <b>o'rtada garant</b> bo'lib turadi.",
+      "📞 Admin tez orada <b>o'zi</b> siz bilan bog'lanadi.",
+      "⏱ O'rtacha kutish: 5–15 daqiqa.",
+      "",
+      "⚠️ Hech kimga adminni chetlab o'tib pul o'tkazmang!",
+    ].join("\n"),
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🔍 Bozor", callback_data: "accounts" }],
           [{ text: "🏠 Bosh menyu", callback_data: "home" }],
         ],
       },
@@ -1187,6 +1277,17 @@ async function handleCallback(cb: NonNullable<Update["callback_query"]>) {
   }
   if (data === "kb") {
     await showKeyboard(chatId, admin);
+    return;
+  }
+  if (data === "more") {
+    await send(chatId, "➕ <b>QO'SHIMCHA BO'LIMLAR</b>\n━━━━━━━━━━━━━━━━━━\nKerakli bandni tanlang 👇", {
+      reply_markup: moreInline(),
+    });
+    return;
+  }
+  if (data.startsWith("req:")) {
+    const [, kind, short] = data.split(":");
+    await sendAdminRequest(chatId, userId, name, kind ?? "help", short, cb.from?.username);
     return;
   }
   if (data.startsWith("acc:")) {
