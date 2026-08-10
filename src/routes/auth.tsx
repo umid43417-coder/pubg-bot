@@ -108,31 +108,38 @@ function AuthPage() {
     if (!validate()) return;
     setBusy(true);
     const email = loginToEmail(login);
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { username: login.trim() } },
-    });
-    if (error) {
-      setBusy(false);
-      toast.error(friendlyAuthError(error.message));
-      return;
-    }
-    if (!data.session) {
-      // Email tasdiqlash yoqilgan bo'lsa ham darhol kirishga urinamiz.
-      const retry = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const res = await fetch("/api/public/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ login: login.trim(), password }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setBusy(false);
+        if (payload.error === "already_registered") {
+          toast.error("Bu login avval ro'yxatdan o'tgan. «Kirish» bo'limidan foydalaning.");
+        } else if (payload.error === "password_invalid") {
+          toast.error("Parol kamida 6 ta belgidan iborat bo'lsin");
+        } else if (payload.error === "login_too_short") {
+          toast.error("Login kamida 3 ta belgidan iborat bo'lsin");
+        } else {
+          toast.error(friendlyAuthError(payload.error ?? "Ro'yxatdan o'tishda xatolik"));
+        }
+        return;
+      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       setBusy(false);
       remember();
-      if (retry.error) {
+      if (error) {
         toast.info("Hisob yaratildi. Endi «Kirish» bo'limidan login qiling.");
         return;
       }
       toast.success("Hisob yaratildi ✅");
-      return;
+    } catch {
+      setBusy(false);
+      toast.error("Tarmoq xatosi. Qayta urinib ko'ring.");
     }
-    setBusy(false);
-    remember();
-    toast.success("Hisob yaratildi ✅");
   }
 
   const inTelegram = typeof window !== "undefined" && Boolean(tgWebApp()?.initData);
