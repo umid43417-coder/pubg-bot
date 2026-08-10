@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ShieldCheck, Send } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, EscrowBanner, SupportButton } from "@/components/AppShell";
 import { ChatThread } from "@/components/ChatThread";
 import { fetchAccount, formatPrice, signMedia, SPEC_FIELDS } from "@/lib/accounts";
 import { fetchAdminTelegram } from "@/lib/settings";
@@ -52,11 +52,14 @@ function AccountPage() {
 
   return (
     <AppShell>
-      <Button asChild variant="ghost" size="sm" className="mb-4 gap-2">
-        <Link to="/">
-          <ArrowLeft className="size-4" /> {t("back_to_shop")}
-        </Link>
-      </Button>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <Button asChild variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-primary">
+          <Link to="/">
+            <ArrowLeft className="size-4" /> {t("back_to_shop")}
+          </Link>
+        </Button>
+        <SupportButton telegram={adminTelegram} />
+      </div>
 
       {isLoading ? (
         <Skeleton className="h-96 rounded-xl" />
@@ -90,13 +93,20 @@ function AccountPage() {
           </div>
 
           <div className="space-y-4">
-            <div className="panel space-y-3 p-5">
+            <div className="panel-neon space-y-3 p-5">
               <div className="flex flex-wrap items-center gap-2">
+                <span className="label-caps">#{account.id.slice(0, 6).toUpperCase()}</span>
                 {account.sold ? <Badge variant="destructive">{t("sold")}</Badge> : null}
-                {account.level ? <Badge variant="secondary">LVL {account.level}</Badge> : null}
+                {account.level ? (
+                  <Badge className="border border-primary/50 bg-primary/15 text-primary">
+                    LVL {account.level}
+                  </Badge>
+                ) : null}
               </div>
-              <h1 className="text-2xl font-bold">{account.title}</h1>
-              <p className="text-3xl font-bold text-primary">
+              <h1 className="font-display text-2xl font-black uppercase tracking-wide">
+                {account.title}
+              </h1>
+              <p className="font-display text-3xl font-black text-neon">
                 {formatPrice(account.price, account.currency)}
               </p>
               {account.description ? (
@@ -123,12 +133,13 @@ function AccountPage() {
 
             <PubgDetails details={(account as { details?: AccountDetails }).details ?? null} />
 
+            <EscrowBanner text={t("escrow_text")} />
+
             <div className="panel space-y-3 p-5">
-              <p className="flex items-center gap-2 text-sm font-bold text-accent">
+              <p className="flex items-center gap-2 text-sm font-bold text-primary">
                 <ShieldCheck className="size-4" /> {t("buy_via_admin")}
               </p>
-              <p className="text-sm text-muted-foreground">{t("escrow_text")}</p>
-              <Button asChild className="w-full font-bold">
+              <Button asChild size="lg" className="h-12 w-full font-display font-black uppercase tracking-widest glow-red">
                 <a
                   href={`https://t.me/${adminTelegram ?? "admin"}`}
                   target="_blank"

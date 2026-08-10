@@ -19,7 +19,7 @@ export function AccountCard({ account }: { account: GameAccount }) {
     <Link
       to="/akkaunt/$id"
       params={{ id: account.id }}
-      className="panel group overflow-hidden transition-all hover:shadow-glow"
+      className="panel group overflow-hidden border-primary/20 transition-all hover:border-primary/60 hover:shadow-glow"
     >
       <div className="relative aspect-video overflow-hidden bg-muted">
         {data?.[0] ? (
@@ -45,8 +45,10 @@ export function AccountCard({ account }: { account: GameAccount }) {
         </div>
       </div>
       <div className="space-y-1 p-4">
-        <h3 className="line-clamp-1 font-display text-sm font-bold">{account.title}</h3>
-        <p className="text-lg font-bold text-primary">
+        <h3 className="line-clamp-1 font-display text-sm font-black uppercase tracking-wide">
+          {account.title}
+        </h3>
+        <p className="font-display text-lg font-black text-neon">
           {formatPrice(account.price, account.currency)}
         </p>
       </div>

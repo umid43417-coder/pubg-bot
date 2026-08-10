@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Trash2, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PageTitle } from "@/components/AppShell";
 import { AccountCard } from "@/components/AccountCard";
 import { fetchAccounts } from "@/lib/accounts";
 import { useI18n } from "@/lib/i18n";
@@ -62,7 +62,7 @@ function MyPage() {
 
   return (
     <AppShell>
-      <h1 className="mb-6 text-2xl font-bold">{t("my_listings")}</h1>
+      <PageTitle accent="MENING" rest={t("my_listings")} />
       {mine.length === 0 ? (
         <div className="panel space-y-4 p-10 text-center">
           <p className="text-muted-foreground">{t("no_my_listings")}</p>

@@ -71,13 +71,13 @@ function Home() {
 
   return (
     <AppShell>
-      <section className="panel relative mb-8 overflow-hidden">
+      <section className="panel-neon relative mb-8 overflow-hidden">
         <img
           src={heroImg}
           alt="PUBG jangchi silueti"
           width={1600}
           height={900}
-          className="absolute inset-0 size-full object-cover opacity-45"
+          className="absolute inset-0 size-full object-cover opacity-35"
         />
         <BulletTracers />
         <BattleScene />
@@ -87,7 +87,7 @@ function Home() {
             <Flame className="fx-blink size-4" /> {t("hero_kicker")}
           </p>
 
-          <h1 className="max-w-lg text-3xl font-bold leading-tight sm:text-4xl">
+          <h1 className="max-w-lg font-display text-3xl font-black uppercase leading-tight tracking-tight sm:text-4xl">
             {t("hero_title_a")} <span className="text-grad">{t("hero_sell")}</span> {t("hero_or")}{" "}
             <span className="text-grad">{t("hero_buy")}</span>
           </h1>

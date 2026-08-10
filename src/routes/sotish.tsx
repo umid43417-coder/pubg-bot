@@ -6,7 +6,7 @@ import { ImagePlus, Loader2, Video, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { useI18n } from "@/lib/i18n";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PageTitle } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -159,8 +159,8 @@ function SellPage() {
 
   return (
     <AppShell>
-      <h1 className="mb-1 text-2xl font-bold">{t("sell_title")}</h1>
-      <p className="mb-6 text-sm text-muted-foreground">{t("sell_text")}</p>
+      <PageTitle accent="AKKAUNT" rest={t("sell_title")} subtitle={t("sell_text")} />
+
 
       <form onSubmit={submit} className="space-y-6">
         <section className="panel space-y-4 p-5">
