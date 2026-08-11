@@ -287,10 +287,7 @@ type Row = { text: string; web_app?: { url: string }; url?: string; callback_dat
 
 /** Asosiy menyu — telefonda ham ixcham (qisqa nomlar, 3 tagacha ustun). */
 async function mainInline(admin: boolean): Promise<{ inline_keyboard: Row[] }> {
-  const base = appUrl();
-
   const rows: Row[] = [
-    [{ text: "🎮 MAGAZIN — MINI APP", web_app: { url: base } }],
     [
       { text: "🔍 Bozor", callback_data: "accounts" },
       { text: "🛒 Sotish", callback_data: "sell" },
@@ -345,10 +342,9 @@ function adminKeyboard() {
   };
 }
 
-async function shopInline(label = "🎮 Magazinni ochish") {
+async function shopInline(_label = "") {
   return {
     inline_keyboard: [
-      [{ text: label, web_app: { url: appUrl() } }],
       [{ text: "🛡 Adminga so'rov (garant)", callback_data: "req:help" }],
       [{ text: "🏠 Bosh menyu", callback_data: "home" }],
     ],
@@ -470,7 +466,6 @@ async function showRules(chatId: number) {
   await send(chatId, rules, {
     reply_markup: {
       inline_keyboard: [
-        [{ text: "🎮 Magazinni ochish", web_app: { url: appUrl() } }],
         [{ text: "🛡 Adminga so'rov (garant)", callback_data: "req:help" }],
         [{ text: "🏠 Bosh menyu", callback_data: "home" }],
       ],
@@ -801,7 +796,6 @@ async function showAccounts(chatId: number) {
         })),
       );
     }
-    rows.push([{ text: "🎮 Barcha akkauntlar (Mini App)", web_app: { url: base } }]);
     rows.push([
       { text: "💸 Arzon", web_app: { url: `${base}/?filtr=arzon` } },
       { text: "💎 Qimmat", web_app: { url: `${base}/?filtr=qimmat` } },
