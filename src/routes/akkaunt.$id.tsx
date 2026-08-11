@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ShieldCheck, Send } from "lucide-react";
+import { ArrowLeft, ShieldCheck, ShoppingCart, Tag } from "lucide-react";
 import { AppShell, EscrowBanner, SupportButton } from "@/components/AppShell";
 import { ChatThread } from "@/components/ChatThread";
 import { fetchAccount, formatPrice, signMedia, SPEC_FIELDS } from "@/lib/accounts";
@@ -52,13 +52,13 @@ function AccountPage() {
 
   return (
     <AppShell>
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 flex items-center justify-between gap-3 pb-0">
         <Button asChild variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-primary">
           <Link to="/">
             <ArrowLeft className="size-4" /> {t("back_to_shop")}
           </Link>
         </Button>
-        <SupportButton telegram={adminTelegram} />
+        <SupportButton telegram={adminTelegram ?? null} />
       </div>
 
       {isLoading ? (
@@ -66,7 +66,7 @@ function AccountPage() {
       ) : !account ? (
         <div className="panel p-10 text-center text-muted-foreground">{t("not_found")}</div>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+        <div className="grid gap-6 pb-40 lg:grid-cols-[1.3fr_1fr] lg:pb-0">
           <div className="space-y-4">
             {imageUrls.map((url, i) => (
               <img
@@ -135,24 +135,28 @@ function AccountPage() {
 
             <EscrowBanner text={t("escrow_text")} />
 
-            <div className="panel space-y-3 p-5">
-              <p className="flex items-center gap-2 text-sm font-bold text-primary">
-                <ShieldCheck className="size-4" /> {t("buy_via_admin")}
-              </p>
-              <Button asChild size="lg" className="h-12 w-full font-display font-black uppercase tracking-widest glow-red">
-                <a
-                  href={`https://t.me/${adminTelegram ?? "admin"}`}
-                  target="_blank"
-                  rel="noreferrer"
+            <div className="fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 border-t border-primary/30 bg-background/95 px-4 py-3 backdrop-blur-xl lg:static lg:rounded-2xl lg:border lg:border-primary/30 lg:p-5">
+              <div className="mx-auto flex max-w-5xl flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Tag className="size-5 text-primary" />
+                  <span className="label-caps">Narxi:</span>
+                  <span className="font-display text-2xl font-black text-neon">
+                    {formatPrice(account.price, account.currency)}
+                  </span>
+                </div>
+                <Button
+                  asChild
+                  size="lg"
+                  className="h-14 w-full font-display text-base font-black uppercase tracking-[0.15em] glow-red"
                 >
-                  <Send className="mr-2 size-4" /> {t("contact_admin")}
-                </a>
-              </Button>
-              {account.contact ? (
-                <p className="text-center text-xs text-muted-foreground">
-                  {t("seller")}: {account.contact}
+                  <a href={`https://t.me/${adminTelegram ?? "admin"}`} target="_blank" rel="noreferrer">
+                    <ShoppingCart className="mr-2 size-5" /> Sotib olish
+                  </a>
+                </Button>
+                <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+                  <ShieldCheck className="size-3.5 text-primary" /> {t("buy_via_admin")}
                 </p>
-              ) : null}
+              </div>
             </div>
 
             <ChatThread accountId={account.id} sellerId={account.user_id} />
