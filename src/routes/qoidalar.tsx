@@ -1,127 +1,156 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Crosshair, Handshake, ShieldCheck, Swords, Timer, TriangleAlert } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
-import { Button } from "@/components/ui/button";
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle, FileCheck2, Headphones, HelpCircle, Lightbulb, ShieldCheck } from "lucide-react";
+import { AppShell, PageTitle } from "@/components/AppShell";
+import { fetchAdminTelegram } from "@/lib/settings";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 export const Route = createFileRoute("/qoidalar")({
   head: () => ({
     meta: [
-      { title: "Qoidalar — PUBG Market" },
+      { title: "Yordam va qoidalar — PUBG Inferno Market" },
       {
         name: "description",
         content:
-          "PUBG Market savdo qoidalari: garant tartibi, xaridor va sotuvchi majburiyatlari, ban sabablari.",
+          "PUBG akkaunt savdosi qoidalari, xavfsizlik maslahatlari va ko'p beriladigan savollarga javoblar.",
       },
-      { property: "og:title", content: "Qoidalar — PUBG Market" },
+      { property: "og:title", content: "Yordam va qoidalar — PUBG Inferno Market" },
       {
         property: "og:description",
-        content: "Halol savdo uchun to'liq qoidalar: garant, tekshiruv va javobgarlik.",
+        content: "Xavfsiz savdo qoidalari, kafolat va admin bilan bog'lanish.",
       },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: RulesPage,
+  component: Rules,
 });
 
-const SECTIONS = [
-  {
-    icon: Crosshair,
-    emoji: "🎯",
-    title: "Umumiy qoidalar",
-    items: [
-      "Bu yerda faqat PUBG Mobile akkauntlari oldi-sotdisi.",
-      "Har bir kelishuv admin kafolati (garant) ostida o'tadi.",
-      "Aldov, spam va soxta e'lon — bir umrlik ban 🚫",
-    ],
-  },
+const CARDS = [
   {
     icon: ShieldCheck,
-    emoji: "🛒",
-    title: "Xaridor uchun",
-    items: [
-      "Avval akkauntning video va rasmlarini to'liq ko'ring.",
-      "Pulni faqat admin orqali o'tkazing.",
-      "Akkauntni olgach, mail va parolni darhol almashtiring 🔐",
-    ],
+    title: "XAVFSIZLIK",
+    text: "Hisoblaringiz xavfsizligi biz uchun ustuvor.",
   },
   {
-    icon: Swords,
-    emoji: "💰",
-    title: "Sotuvchi uchun",
-    items: [
-      "E'londa haqiqiy LVL, skin, RP va statistikani ko'rsating.",
-      "Rasm va video o'zingizniki bo'lsin.",
-      "Sotilgan akkauntni qaytarib olishga urinish — ban + qora ro'yxat ⚠️",
-    ],
+    icon: FileCheck2,
+    title: "QOIDALAR",
+    text: "Platformadan foydalanish qoidalari bilan tanishing.",
   },
   {
-    icon: Handshake,
-    emoji: "🤝",
-    title: "Savdo tartibi",
-    items: [
-      "1️⃣ Xaridor adminga yozadi",
-      "2️⃣ Admin sotuvchi bilan bog'lanadi",
-      "3️⃣ Pul admin qo'lida turadi (garant)",
-      "4️⃣ Akkaunt topshiriladi va tekshiriladi",
-      "5️⃣ Pul sotuvchiga o'tkaziladi ✅",
-    ],
-  },
-  {
-    icon: Timer,
-    emoji: "⏱",
-    title: "Tekshiruv va javobgarlik",
-    items: [
-      "Tekshiruv muddati: 24 soat.",
-      "Muammo chiqsa, admin masalani hal qiladi.",
-      "Qoidani buzgan tomon pulni qaytaradi.",
-    ],
+    icon: Lightbulb,
+    title: "MASLAHATLAR",
+    text: "Xavfsiz savdo uchun foydali tavsiyalar.",
   },
 ];
 
-function RulesPage() {
+const FAQ = [
+  {
+    q: "Hisob sotish yoki sotib olish xavfsizmi?",
+    a: "Ha. Har bir bitim admin nazoratida o'tadi — pul admin qo'lida turadi va akkaunt to'liq topshirilgach sotuvchiga o'tkaziladi.",
+  },
+  {
+    q: "Hisobimga kafolat beriladimi?",
+    a: "Sotuvchi kafolat muddatini ko'rsatadi. Kafolat davomida muammo chiqsa admin bitimni qaytaradi.",
+  },
+  {
+    q: "Savdodan keyin muammo yuzaga kelsa-chi?",
+    a: "Darhol admin bilan bog'laning va bitim ID sini yuboring. Tekshiruvdan so'ng mablag' qaytariladi yoki muammo hal qilinadi.",
+  },
+  {
+    q: "Qanday to'lov usullari mavjud?",
+    a: "UZCARD/HUMO karta orqali admin hisobiga to'lov qilinadi. Boshqa usullar admin bilan kelishiladi.",
+  },
+  {
+    q: "E'lon joylashtirish uchun to'lov bormi?",
+    a: "Yo'q, e'lon joylashtirish bepul. Faqat muvaffaqiyatli bitimdan xizmat haqi olinadi.",
+  },
+  {
+    q: "Hisob qaytarib olish holatlari qanday hal qilinadi?",
+    a: "Sotuvchi akkauntni qaytarib olishga urinsa, u bloklanadi va xaridorga to'liq mablag' qaytariladi.",
+  },
+];
+
+function Rules() {
+  const { data: adminTelegram } = useQuery({
+    queryKey: ["admin-telegram"],
+    queryFn: fetchAdminTelegram,
+    staleTime: 10 * 60 * 1000,
+  });
+
   return (
     <AppShell>
-      <section className="panel mb-6 p-6">
-        <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-primary">
-          <TriangleAlert className="size-4" /> Rules of the Battleground
-        </p>
-        <h1 className="mt-3 text-3xl font-bold">
-          📜 <span className="text-grad">QOIDALAR</span>
-        </h1>
-        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Halol savdo — tinch o'yin. Quyidagi qoidalar barcha gamerlar uchun majburiy.
-        </p>
-      </section>
+      <PageTitle accent="YORDAM" rest="VA QOIDALAR" />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {SECTIONS.map(({ icon: Icon, emoji, title, items }) => (
-          <section key={title} className="panel space-y-3 p-5">
-            <h2 className="flex items-center gap-2 text-base font-bold">
-              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-grad-hero text-primary-foreground">
-                <Icon className="size-4" />
-              </span>
-              <span className="truncate">
-                {emoji} {title}
-              </span>
-            </h2>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              {items.map((item) => (
-                <li key={item} className="flex gap-2">
-                  <span className="text-primary">▸</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
+      <div className="mb-6 grid grid-cols-3 gap-2">
+        {CARDS.map(({ icon: Icon, title, text }) => (
+          <div
+            key={title}
+            className="relative overflow-hidden rounded-2xl border border-border bg-card/70 p-3 text-center"
+          >
+            <Icon className="mx-auto size-8 text-primary" />
+            <p className="mt-2 font-display text-[11px] font-black uppercase tracking-wider">
+              {title}
+            </p>
+            <p className="mt-1 text-[10px] leading-tight text-muted-foreground">{text}</p>
+            <span className="absolute inset-x-6 bottom-0 h-0.5 rounded-full bg-primary/70 blur-[1px]" />
+          </div>
         ))}
       </div>
 
-      <div className="panel mt-6 flex flex-wrap items-center justify-between gap-3 p-5">
-        <p className="text-sm font-bold">🔥 GG WP — halol savdo, tinch o'yin!</p>
-        <Button asChild className="font-bold">
-          <Link to="/">🛒 Magazinga qaytish</Link>
-        </Button>
+      <div className="mb-4 flex items-center gap-2">
+        <HelpCircle className="size-6 text-primary" />
+        <h2 className="font-display text-base font-black uppercase tracking-wider">
+          Ko'p beriladigan savollar
+        </h2>
+      </div>
+
+      <Accordion type="single" collapsible className="mb-6 space-y-2">
+        {FAQ.map((item, i) => (
+          <AccordionItem
+            key={item.q}
+            value={`q${i}`}
+            className="rounded-xl border border-border bg-card/70 px-4"
+          >
+            <AccordionTrigger className="text-left text-sm font-bold hover:no-underline">
+              <span>
+                <span className="mr-2 font-display text-primary">{i + 1}.</span>
+                {item.q}
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
+              {item.a}
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+
+      <a
+        href={`https://t.me/${adminTelegram ?? "admin"}`}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center justify-center gap-3 rounded-2xl bg-primary px-4 py-4 text-primary-foreground glow-red transition-transform active:scale-[0.99]"
+      >
+        <Headphones className="size-8 shrink-0" />
+        <span className="text-center">
+          <span className="block font-display text-lg font-black uppercase tracking-wider">
+            Admin bilan bog'lanish
+          </span>
+          <span className="block text-xs opacity-90">
+            Savollaringiz bormi? Biz yordam berishga tayyormiz!
+          </span>
+        </span>
+      </a>
+
+      <div className="mt-4 flex items-start gap-3 rounded-2xl border border-border bg-card/70 p-4">
+        <AlertTriangle className="mt-0.5 size-6 shrink-0 text-primary" />
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Hisoblaringiz xavfsizligi uchun <span className="text-primary">hech qachon</span>{" "}
+          login/parol ma'lumotlaringizni uchinchi shaxslarga bermang.
+        </p>
       </div>
     </AppShell>
   );
