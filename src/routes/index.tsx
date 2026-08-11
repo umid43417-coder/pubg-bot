@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Flame, Search, ShieldCheck, Sparkles } from "lucide-react";
+import { Flame, Headphones, Search, ShieldCheck, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AccountCard } from "@/components/AccountCard";
 import { fetchAccounts } from "@/lib/accounts";
@@ -71,38 +71,53 @@ function Home() {
 
   return (
     <AppShell>
-      <section className="panel-neon relative mb-8 overflow-hidden">
+      <section className="panel-neon relative mb-6 overflow-hidden">
         <img
           src={heroImg}
           alt="PUBG jangchi silueti"
           width={1600}
           height={900}
-          className="absolute inset-0 size-full object-cover opacity-35"
+          className="absolute inset-0 size-full object-cover opacity-40 fx-kenburns"
         />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/70 to-background" />
         <BulletTracers />
         <BattleScene />
         <FloatingGun className="absolute -right-6 top-4 z-10 hidden sm:block" />
-        <div className="relative space-y-4 p-6 pb-40 sm:p-10 sm:pb-52">
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-primary">
-            <Flame className="fx-blink size-4" /> {t("hero_kicker")}
+        <div className="relative space-y-3 p-6 pb-40 text-center sm:p-10 sm:pb-52">
+          <p className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.4em] text-primary">
+            <Flame className="fx-blink size-4" /> Inferno Market
           </p>
-
-          <h1 className="max-w-lg font-display text-3xl font-black uppercase leading-tight tracking-tight sm:text-4xl">
-            {t("hero_title_a")} <span className="text-grad">{t("hero_sell")}</span> {t("hero_or")}{" "}
-            <span className="text-grad">{t("hero_buy")}</span>
+          <h1 className="font-display text-3xl font-black uppercase leading-none tracking-tight sm:text-5xl">
+            XUSH KELIBSIZ!
           </h1>
-          <p className="max-w-md text-sm text-muted-foreground">{t("hero_text")}</p>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button asChild size="lg" className="font-bold">
-              <Link to="/sotish">
-                <Sparkles className="mr-2 size-4" /> {t("post_listing")}
-              </Link>
-            </Button>
-            <div className="inline-flex h-11 items-center gap-2 rounded-lg border border-accent/40 bg-card/80 px-4 text-sm font-semibold backdrop-blur">
-              <ShieldCheck className="size-4 shrink-0 text-accent" />
-              <span className="whitespace-nowrap">{t("admin_guarantee")}</span>
-              <SpinningCrosshair className="size-6 text-[10px]" />
-            </div>
+          <p className="font-display text-lg font-black uppercase tracking-[0.12em] text-neon sm:text-2xl">
+            PUBG INFERNO MARKET
+          </p>
+          <p className="mx-auto max-w-md text-sm text-muted-foreground">
+            PUBG akkauntlarini <span className="text-primary">xavfsiz</span> va{" "}
+            <span className="text-primary">ishonchli</span> tarzda xarid qiling va soting!
+          </p>
+          <Button
+            asChild
+            size="lg"
+            className="h-14 w-full max-w-md font-display text-lg font-black uppercase tracking-[0.2em] glow-red"
+          >
+            <Link to="/sotish">
+              <Sparkles className="mr-2 size-5" /> Boshlash
+            </Link>
+          </Button>
+          <div className="mx-auto grid max-w-md grid-cols-3 gap-2 pt-2">
+            {[
+              { icon: ShieldCheck, t: "100% XAVFSIZ", d: "Hisobingiz biz uchun muhim" },
+              { icon: Flame, t: "ENG YAXSHI NARX", d: "Bozordagi eng arzon takliflar" },
+              { icon: Headphones, t: "24/7 YORDAM", d: "Istalgan vaqtda javob beramiz" },
+            ].map(({ icon: Icon, t: title, d }) => (
+              <div key={title} className="rounded-xl border border-border/70 bg-card/70 p-3">
+                <Icon className="mx-auto size-6 text-primary" />
+                <p className="mt-2 text-[10px] font-black uppercase tracking-wider">{title}</p>
+                <p className="mt-1 text-[10px] leading-tight text-muted-foreground">{d}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -189,13 +204,13 @@ function Home() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-64 rounded-xl" />
+            <Skeleton key={i} className="h-32 rounded-2xl" />
           ))}
         </div>
       ) : list.length > 0 ? (
-        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {list.map((a) => (
             <AccountCard key={a.id} account={a} />
           ))}
